@@ -1,0 +1,26 @@
+{
+  "name": "scuffed-block-game",
+  "version": "1.0.0",
+  "description": "Voxel game in threejs",
+  "main": "build.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "webpack",
+    "dev": "webpack watch"
+  },
+  "devDependencies": {
+    "@types/node": "^16.10.1",
+    "@types/three": "^0.132.2",
+    "nodemon": "^2.0.13",
+    "ts-loader": "^8.1.0",
+    "ts-node": "^10.2.1",
+    "typescript": "^4.2.4",
+    "webpack": "^5.33.2",
+    "webpack-cli": "^4.6.0"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "three": "^0.133.1"
+  }
+}
