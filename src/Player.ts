@@ -103,7 +103,7 @@ export default class Player {
   }
 
   isOnGround(): boolean {
-    const raycaster = new Raycaster(this.object.position, new Vector3(0, -1, 0), 0, this.height / 2 + 0.1);
+    const raycaster = new Raycaster(this.object.position, new Vector3(0, -1, 0), 0, this.height / 2 + 0.001);
     const intersections = raycaster.intersectObjects(Engine.currScene.collidables);
     return intersections.length > 0;
   }
