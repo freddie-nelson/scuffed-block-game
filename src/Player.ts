@@ -4,21 +4,21 @@ import Engine from "./Engine";
 export default class Player {
   height = 2;
   width = 1;
-  acceleration = 80;
-  friction = 80;
+  acceleration = 160;
+  friction = 60;
   jumpForce = 6;
   weight = 12;
   velocity = new Vector3(0, 0, 0);
-  maxVelocity = new Vector3(10, 150, 10);
-  cameraPos = new Vector3(this.width / 2 - 0.01, this.width / 2, 0);
+  maxVelocity = new Vector3(5, 20, 5);
+  cameraPos = new Vector3(4, 2, 0);
   object: Mesh;
-  noClip = true;
+  noClip = false;
 
   constructor(x: number, y: number, z: number) {
     const geometry = new BoxBufferGeometry(this.width, this.height, this.width);
     const material = new MeshBasicMaterial({ color: 0x0000ff });
     this.object = new Mesh(geometry, material);
-    this.object.position.set(x, y + this.height / 2, z);
+    this.object.position.set(x, y + this.height, z);
   }
 
   init() {
@@ -34,8 +34,7 @@ export default class Player {
     // player movement
     let movedX = false;
     let movedZ = false;
-
-    const isOnGround = this.isOnGround();
+    const isOnGround = this.isOnGround(delta);
     const acceleration = this.acceleration * (isOnGround ? 1 : 0.3);
 
     if (keyController.isKeyPressed("KeyA")) {
@@ -79,19 +78,9 @@ export default class Player {
       if (Math.sign(this.velocity.z) !== sign.z) this.velocity.z = 0;
     }
 
-    Engine.mouseController.controls.moveForward(this.velocity.z * delta);
-    Engine.mouseController.controls.moveRight(this.velocity.x * delta);
-
     // jump
-    let jumped = false;
-
-    if (isOnGround && !this.noClip) {
-      this.velocity.y = 0;
-
-      if (keyController.isKeyPressed("Space")) {
-        this.velocity.y = this.jumpForce;
-        jumped = true;
-      }
+    if (isOnGround && !this.noClip && keyController.isKeyPressed("Space")) {
+      this.velocity.y = this.jumpForce;
     } else if (this.noClip) {
       if (keyController.isKeyPressed("Space")) {
         this.velocity.y = this.jumpForce;
@@ -100,21 +89,73 @@ export default class Player {
       } else {
         this.velocity.y = 0;
       }
-    } else {
+    } else if (!isOnGround) {
       this.velocity.y -= this.weight * delta;
       if (Math.abs(this.velocity.y) > this.maxVelocity.y)
         this.velocity.y = this.maxVelocity.y * Math.sign(this.velocity.y);
     }
 
+    // update positions
     this.object.position.y += this.velocity.y * delta;
+    Engine.mouseController.controls.moveForward(this.velocity.z * delta);
+    Engine.mouseController.controls.moveRight(this.velocity.x * delta);
 
     // sync player and camera position
     this.object.position.add(Engine.camera.position.clone().sub(this.cameraPos));
     Engine.camera.position.copy(this.cameraPos);
+
+    this.collide(delta);
   }
 
-  isOnGround(): boolean {
-    const raycaster = new Raycaster(this.object.position, new Vector3(0, -1, 0), 0, this.height / 2 + 0.001);
+  collide(delta: number) {
+    const diff = this.velocity.clone().multiplyScalar(delta);
+
+    // y casts
+    const diffY = this.height / 2 + Math.abs(diff.y);
+    if (diff.y < 0) {
+      const raycaster = new Raycaster(this.object.position, new Vector3(0, -1, 0), 0, diffY);
+      const intersections = raycaster.intersectObjects(Engine.currScene.collidables);
+      if (intersections.length > 0) this.velocity.y = 0;
+    } else if (diff.y > 0) {
+      const raycaster = new Raycaster(this.object.position, new Vector3(0, 1, 0), 0, diffY);
+      const intersections = raycaster.intersectObjects(Engine.currScene.collidables);
+      if (intersections.length > 0) this.velocity.y = 0;
+    }
+
+    // x casts
+    const diffX = this.width / 2 + Math.abs(diff.x);
+    if (diff.x < 0) {
+      const raycaster = new Raycaster(this.object.position, new Vector3(0, 0, 1), 0, diffX);
+      const intersections = raycaster.intersectObjects(Engine.currScene.collidables);
+      console.log("X", intersections[0]?.point);
+      if (intersections.length > 0) this.velocity.x = 0;
+    } else if (diff.x > 0) {
+      const raycaster = new Raycaster(this.object.position, new Vector3(0, 0, 1), 0, diffX);
+      const intersections = raycaster.intersectObjects(Engine.currScene.collidables);
+      if (intersections.length > 0) this.velocity.x = 0;
+    }
+
+    // z casts
+    const diffZ = this.width / 2 + Math.abs(diff.z);
+    if (diff.z < 0) {
+      const raycaster = new Raycaster(this.object.position, new Vector3(-1, 0, 0), 0, diffZ);
+      const intersections = raycaster.intersectObjects(Engine.currScene.collidables);
+      console.log("Z", intersections[0]?.point);
+      if (intersections.length > 0) this.velocity.z = 0;
+    } else if (diff.z > 0) {
+      const raycaster = new Raycaster(this.object.position, new Vector3(1, 0, 0), 0, diffZ);
+      const intersections = raycaster.intersectObjects(Engine.currScene.collidables);
+      if (intersections.length > 0) this.velocity.z = 0;
+    }
+  }
+
+  isOnGround(delta: number): boolean {
+    const raycaster = new Raycaster(
+      this.object.position,
+      new Vector3(0, -1, 0),
+      0,
+      this.height / 2 + this.velocity.y * delta
+    );
     const intersections = raycaster.intersectObjects(Engine.currScene.collidables);
     return intersections.length > 0;
   }

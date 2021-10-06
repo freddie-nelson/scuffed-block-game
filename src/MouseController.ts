@@ -49,6 +49,12 @@ export default class MouseController {
     });
   }
 
+  removeListener(type: Listener["type"], cb: Listener["cb"]) {
+    Engine.element.removeEventListener(type, cb);
+    const i = this.listeners.findIndex((l) => l.type === type && l.cb === cb);
+    if (i !== -1) this.listeners.splice(i, 1);
+  }
+
   clearListeners() {
     this.listeners.forEach((l) => Engine.element.removeEventListener(l.type, l.cb));
   }

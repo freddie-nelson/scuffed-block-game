@@ -8,4 +8,37 @@
 body {
   overflow: hidden;
 }
+
+.crosshair {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  left: 0;
+  margin: auto;
+  width: 26px;
+  height: 26px;
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-pack: center;
+      -ms-flex-pack: center;
+          justify-content: center;
+  -webkit-box-align: center;
+      -ms-flex-align: center;
+          align-items: center;
+}
+
+.crosshair::before, .crosshair::after {
+  content: "";
+  position: absolute;
+  background-color: white;
+  width: 5px;
+  height: 100%;
+}
+
+.crosshair::before {
+  -webkit-transform: rotate(90deg);
+          transform: rotate(90deg);
+}
 /*# sourceMappingURL=main.css.map */

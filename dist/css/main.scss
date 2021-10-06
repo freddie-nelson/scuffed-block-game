@@ -7,3 +7,30 @@
 body {
   overflow: hidden;
 }
+
+.crosshair {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  left: 0;
+  margin: auto;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  &::before,
+  &::after {
+    content: "";
+    position: absolute;
+    background-color: white;
+    width: 5px;
+    height: 100%;
+  }
+
+  &::before {
+    transform: rotate(90deg);
+  }
+}
