@@ -12,12 +12,13 @@ export default class Player {
   maxVelocity = new Vector3(10, 150, 10);
   cameraPos = new Vector3(this.width / 2 - 0.01, this.width / 2, 0);
   object: Mesh;
+  noClip = true;
 
-  constructor() {
+  constructor(x: number, y: number, z: number) {
     const geometry = new BoxBufferGeometry(this.width, this.height, this.width);
     const material = new MeshBasicMaterial({ color: 0x0000ff });
     this.object = new Mesh(geometry, material);
-    this.object.position.y = 20;
+    this.object.position.set(x, y + this.height / 2, z);
   }
 
   init() {
@@ -34,27 +35,30 @@ export default class Player {
     let movedX = false;
     let movedZ = false;
 
+    const isOnGround = this.isOnGround();
+    const acceleration = this.acceleration * (isOnGround ? 1 : 0.3);
+
     if (keyController.isKeyPressed("KeyA")) {
       movedX = true;
-      this.velocity.x -= this.acceleration * delta;
+      this.velocity.x -= acceleration * delta;
       if (Math.abs(this.velocity.x) > this.maxVelocity.x)
         this.velocity.x = this.maxVelocity.x * Math.sign(this.velocity.x);
     }
     if (keyController.isKeyPressed("KeyD")) {
       movedX = true;
-      this.velocity.x += this.acceleration * delta;
+      this.velocity.x += acceleration * delta;
       if (Math.abs(this.velocity.x) > this.maxVelocity.x)
         this.velocity.x = this.maxVelocity.x * Math.sign(this.velocity.x);
     }
     if (keyController.isKeyPressed("KeyW")) {
       movedZ = true;
-      this.velocity.z += this.acceleration * delta;
+      this.velocity.z += acceleration * delta;
       if (Math.abs(this.velocity.z) > this.maxVelocity.z)
         this.velocity.z = this.maxVelocity.z * Math.sign(this.velocity.z);
     }
     if (keyController.isKeyPressed("KeyS")) {
       movedZ = true;
-      this.velocity.z -= this.acceleration * delta;
+      this.velocity.z -= acceleration * delta;
       if (Math.abs(this.velocity.z) > this.maxVelocity.z)
         this.velocity.z = this.maxVelocity.z * Math.sign(this.velocity.z);
     }
@@ -79,15 +83,22 @@ export default class Player {
     Engine.mouseController.controls.moveRight(this.velocity.x * delta);
 
     // jump
-    const isOnGround = this.isOnGround();
     let jumped = false;
 
-    if (isOnGround) {
+    if (isOnGround && !this.noClip) {
       this.velocity.y = 0;
 
       if (keyController.isKeyPressed("Space")) {
         this.velocity.y = this.jumpForce;
         jumped = true;
+      }
+    } else if (this.noClip) {
+      if (keyController.isKeyPressed("Space")) {
+        this.velocity.y = this.jumpForce;
+      } else if (keyController.isKeyPressed("ShiftLeft")) {
+        this.velocity.y = -this.jumpForce;
+      } else {
+        this.velocity.y = 0;
       }
     } else {
       this.velocity.y -= this.weight * delta;
