@@ -9,7 +9,7 @@ export default class Engine {
   static element: HTMLCanvasElement;
   static currScene: Scene;
   static readonly renderScene = new TScene();
-  static readonly renderer: Renderer = new WebGLRenderer();
+  static readonly renderer: WebGLRenderer = new WebGLRenderer();
   static camera: PerspectiveCamera;
   static readonly clock = new Clock(false);
   private static delta = 30;

@@ -4,16 +4,14 @@ import Scene from "./Scene";
 import Voxel, { corners, dir, Neighbours } from "../Voxel";
 import { makeNoise2D } from "fast-simplex-noise";
 import {
-  BackSide,
-  BoxGeometry,
   BufferAttribute,
   BufferGeometry,
   Color,
+  CubeTextureLoader,
   DirectionalLight,
   DoubleSide,
   HemisphereLight,
   Mesh,
-  MeshBasicMaterial,
   MeshLambertMaterial,
 } from "three";
 const noise = makeNoise2D();
@@ -28,7 +26,7 @@ export default class World extends Scene {
   chunkHeight = 50;
   bedrock = -30;
   voxelSize = 1;
-  worldSize = 20;
+  worldSize = 10;
 
   constructor(id: string) {
     super(id);
@@ -36,9 +34,18 @@ export default class World extends Scene {
 
   init() {
     // create skybox
-    Engine.renderScene.background = new Color("lightblue");
+    const loader = new CubeTextureLoader();
+    const texture = loader.load([
+      "assets/skybox/day_px.png",
+      "assets/skybox/day_nx.png",
+      "assets/skybox/day_py.png",
+      "assets/skybox/day_ny.png",
+      "assets/skybox/day_pz.png",
+      "assets/skybox/day_nz.png",
+    ]);
+    Engine.renderScene.background = texture;
 
-    const skylight = new HemisphereLight("lightblue", "green", 1);
+    const skylight = new HemisphereLight("lightblue", "blue", 1);
     Engine.renderScene.add(skylight);
 
     this.addLight(-1, 2, 4);
