@@ -1,8 +1,8 @@
-import { BoxBufferGeometry, Mesh, MeshBasicMaterial } from "three";
+import { BoxBufferGeometry, Mesh, MeshPhongMaterial } from "three";
 
 const size = 1;
 const geometry = new BoxBufferGeometry(size, size, size);
-const material = new MeshBasicMaterial({ color: 0x00ff00 });
+const material = new MeshPhongMaterial({ color: 0x5b8726 });
 const mesh = new Mesh(geometry, material);
 
 export default class Voxel {

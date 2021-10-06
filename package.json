@@ -22,7 +22,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "noisejs": "^2.1.0",
+    "fast-simplex-noise": "^4.0.0",
     "three": "^0.133.1"
   }
 }

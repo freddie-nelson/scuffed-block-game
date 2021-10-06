@@ -41,7 +41,7 @@ export default class Engine {
   }
 
   static setupPerspectiveCam() {
-    Engine.camera = new PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
+    Engine.camera = new PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 30000);
     Engine.mouseController.refresh();
     Engine.renderScene.add(Engine.camera);
   }

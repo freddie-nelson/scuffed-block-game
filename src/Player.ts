@@ -17,7 +17,7 @@ export default class Player {
     const geometry = new BoxBufferGeometry(this.width, this.height, this.width);
     const material = new MeshBasicMaterial({ color: 0x0000ff });
     this.object = new Mesh(geometry, material);
-    this.object.position.y = 40;
+    this.object.position.y = 20;
   }
 
   init() {
