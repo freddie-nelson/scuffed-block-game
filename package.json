@@ -10,6 +10,7 @@
   },
   "devDependencies": {
     "@types/node": "^16.10.1",
+    "@types/noisejs": "^0.0.28",
     "@types/three": "^0.132.2",
     "nodemon": "^2.0.13",
     "ts-loader": "^8.1.0",
@@ -21,6 +22,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "noisejs": "^2.1.0",
     "three": "^0.133.1"
   }
 }
