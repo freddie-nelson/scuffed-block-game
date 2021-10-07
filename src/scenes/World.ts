@@ -222,25 +222,31 @@ export default class World extends Scene {
     };
   }
 
-  getVoxel(x: number, y: number, z: number) {
-    const chunkX = Math.floor(x / this.chunkSize) + this.chunkOffset;
-    const chunkY = Math.floor(z / this.chunkSize) + this.chunkOffset;
-    if (chunkX < 0 || chunkX >= this.worldSize || chunkY < 0 || chunkX >= this.worldSize) return;
+  getVoxel(x: number, y: number, z: number, chunkPos?: { x?: number; y?: number }) {
+    const chunkX = Math.floor(x / this.chunkSize) + this.chunkOffset; // 1
+    const chunkY = Math.floor(z / this.chunkSize) + this.chunkOffset; // 1
+    if (chunkX < 0 || chunkX >= this.worldSize || chunkY < 0 || chunkY >= this.worldSize) return;
     const chunk = this.chunks[chunkY][chunkX];
 
-    const relY = y + Math.abs(this.bedrock);
+    const relY = y + Math.abs(this.bedrock); // 40
     const relX = x + Math.abs(chunk[0][0][0].x) * Math.sign(x * -1);
+    // console.log(chunk[0][0][0].x);
     const relZ = z + Math.abs(chunk[0][0][0].z) * Math.sign(z * -1);
-    console.log(relY, relX, relZ);
+    // console.log(relY, relX, relZ);
     if (
       relY < 0 ||
       relY >= this.chunkHeight ||
       relX < 0 ||
-      relX >= this.worldSize ||
+      relX >= this.chunkSize ||
       relZ < 0 ||
-      relZ >= this.worldSize
+      relZ >= this.chunkSize
     )
       return;
+
+    if (chunkPos) {
+      chunkPos.x = chunkX;
+      chunkPos.y = chunkY;
+    }
 
     return chunk[relY][relX][relZ];
   }

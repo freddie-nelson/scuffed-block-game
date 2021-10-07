@@ -1,16 +1,21 @@
-import { BoxBufferGeometry, Mesh, MeshBasicMaterial, Raycaster, Vector3 } from "three";
+import { BoxBufferGeometry, Mesh, MeshBasicMaterial, Vector3 } from "three";
 import Engine from "./Engine";
+import World from "./scenes/World";
+import Voxel, { Neighbours } from "./Voxel";
 
 export default class Player {
   height = 2;
   width = 1;
-  acceleration = 160;
+  walkForce = 5;
   friction = 60;
   jumpForce = 6;
   weight = 12;
+  acceleration = 120;
   velocity = new Vector3(0, 0, 0);
+  lastPosition = new Vector3();
   maxVelocity = new Vector3(5, 20, 5);
-  cameraPos = new Vector3(4, 2, 0);
+  // cameraPos = new Vector3(0, 0, 4);
+  cameraPos = new Vector3(0, this.height / 4, 0);
   object: Mesh;
   noClip = false;
 
@@ -18,49 +23,63 @@ export default class Player {
     const geometry = new BoxBufferGeometry(this.width, this.height, this.width);
     const material = new MeshBasicMaterial({ color: 0x0000ff });
     this.object = new Mesh(geometry, material);
+
     this.object.position.set(x, y + this.height, z);
+    this.lastPosition.copy(this.object.position);
   }
 
   init() {
     Engine.renderScene.add(this.object);
-    this.object.add(Engine.camera);
-    Engine.camera.position.copy(this.cameraPos);
+    Engine.camera.position.copy(this.object.position).add(this.cameraPos);
   }
 
   update() {
     const keyController = Engine.keyController;
     const delta = Engine.getDelta();
 
-    // player movement
-    let movedX = false;
-    let movedZ = false;
-    const isOnGround = this.isOnGround(delta);
-    const acceleration = this.acceleration * (isOnGround ? 1 : 0.3);
+    // copy camera rotation to player
+    this.object.rotation.y = Engine.camera.rotation.y;
 
-    if (keyController.isKeyPressed("KeyA")) {
-      movedX = true;
-      this.velocity.x -= acceleration * delta;
-      if (Math.abs(this.velocity.x) > this.maxVelocity.x)
-        this.velocity.x = this.maxVelocity.x * Math.sign(this.velocity.x);
-    }
-    if (keyController.isKeyPressed("KeyD")) {
-      movedX = true;
-      this.velocity.x += acceleration * delta;
-      if (Math.abs(this.velocity.x) > this.maxVelocity.x)
-        this.velocity.x = this.maxVelocity.x * Math.sign(this.velocity.x);
-    }
+    // player movement
+    let moveF = false;
+    let moveB = false;
+    let moveL = false;
+    let moveR = false;
+    const isOnGround = this.isOnGround(delta);
+    const acceleration = this.acceleration * (isOnGround ? 1 : 0.1);
+
     if (keyController.isKeyPressed("KeyW")) {
-      movedZ = true;
+      moveF = true;
       this.velocity.z += acceleration * delta;
       if (Math.abs(this.velocity.z) > this.maxVelocity.z)
         this.velocity.z = this.maxVelocity.z * Math.sign(this.velocity.z);
     }
     if (keyController.isKeyPressed("KeyS")) {
-      movedZ = true;
+      moveB = true;
       this.velocity.z -= acceleration * delta;
       if (Math.abs(this.velocity.z) > this.maxVelocity.z)
         this.velocity.z = this.maxVelocity.z * Math.sign(this.velocity.z);
     }
+    if (keyController.isKeyPressed("KeyA")) {
+      moveL = true;
+      this.velocity.x -= acceleration * delta;
+      if (Math.abs(this.velocity.x) > this.maxVelocity.x)
+        this.velocity.x = this.maxVelocity.x * Math.sign(this.velocity.x);
+    }
+    if (keyController.isKeyPressed("KeyD")) {
+      moveR = true;
+      this.velocity.x += acceleration * delta;
+      if (Math.abs(this.velocity.x) > this.maxVelocity.x)
+        this.velocity.x = this.maxVelocity.x * Math.sign(this.velocity.x);
+    }
+
+    // ensure consistent movement in all directions
+    // this.direction.x = Number(moveR) - Number(moveL);
+    // this.direction.z = Number(moveF) - Number(moveB);
+    // this.direction.normalize();
+
+    // this.velocity.x *= this.direction.x * Math.sign(this.velocity.x);
+    // this.velocity.z *= this.direction.z * Math.sign(this.velocity.z);
 
     // apply friction
     const sign = {
@@ -69,11 +88,11 @@ export default class Player {
       z: Math.sign(this.velocity.z),
     };
 
-    if (!movedX) {
+    if (!moveL && !moveR) {
       this.velocity.x -= sign.x * this.friction * delta;
       if (Math.sign(this.velocity.x) !== sign.x) this.velocity.x = 0;
     }
-    if (!movedZ) {
+    if (!moveF && !moveB) {
       this.velocity.z -= sign.z * this.friction * delta;
       if (Math.sign(this.velocity.z) !== sign.z) this.velocity.z = 0;
     }
@@ -95,68 +114,97 @@ export default class Player {
         this.velocity.y = this.maxVelocity.y * Math.sign(this.velocity.y);
     }
 
+    if (!this.noClip) this.collide(delta);
+    this.lastPosition.copy(this.object.position);
+
     // update positions
     this.object.position.y += this.velocity.y * delta;
-    Engine.mouseController.controls.moveForward(this.velocity.z * delta);
+    Engine.camera.position.copy(this.object.position).add(this.cameraPos);
+
+    // update camera position then move player to camera
     Engine.mouseController.controls.moveRight(this.velocity.x * delta);
-
-    // sync player and camera position
-    this.object.position.add(Engine.camera.position.clone().sub(this.cameraPos));
-    Engine.camera.position.copy(this.cameraPos);
-
-    this.collide(delta);
+    Engine.mouseController.controls.moveForward(this.velocity.z * delta);
+    this.object.position.copy(Engine.camera.position).sub(this.cameraPos);
   }
 
   collide(delta: number) {
-    const diff = this.velocity.clone().multiplyScalar(delta);
+    const world = <World>Engine.currScene;
+    const globalVelocity = this.object.position.clone().sub(this.lastPosition);
+    // console.log(globalVelocity);
 
-    // y casts
-    const diffY = this.height / 2 + Math.abs(diff.y);
-    if (diff.y < 0) {
-      const raycaster = new Raycaster(this.object.position, new Vector3(0, -1, 0), 0, diffY);
-      const intersections = raycaster.intersectObjects(Engine.currScene.collidables);
-      if (intersections.length > 0) this.velocity.y = 0;
-    } else if (diff.y > 0) {
-      const raycaster = new Raycaster(this.object.position, new Vector3(0, 1, 0), 0, diffY);
-      const intersections = raycaster.intersectObjects(Engine.currScene.collidables);
-      if (intersections.length > 0) this.velocity.y = 0;
+    // top is center voxel
+    const feet = this.getCollidingVoxels(
+      this.object.position.x,
+      Math.floor(this.object.position.y - this.height / 2),
+      this.object.position.z
+    );
+
+    const head = this.getCollidingVoxels(
+      this.object.position.x,
+      Math.floor(this.object.position.y + this.height / 2),
+      this.object.position.z
+    );
+
+    // falling
+    if (globalVelocity.y < 0 && feet.top && feet.top.id !== 0) {
+      this.velocity.y = 0;
+      this.object.position.y = feet.top.y + this.height;
+      // console.log(this.object.position.y);
     }
 
-    // x casts
-    const diffX = this.width / 2 + Math.abs(diff.x);
-    if (diff.x < 0) {
-      const raycaster = new Raycaster(this.object.position, new Vector3(0, 0, 1), 0, diffX);
-      const intersections = raycaster.intersectObjects(Engine.currScene.collidables);
-      console.log("X", intersections[0]?.point);
-      if (intersections.length > 0) this.velocity.x = 0;
-    } else if (diff.x > 0) {
-      const raycaster = new Raycaster(this.object.position, new Vector3(0, 0, 1), 0, diffX);
-      const intersections = raycaster.intersectObjects(Engine.currScene.collidables);
-      if (intersections.length > 0) this.velocity.x = 0;
+    // moving x
+    if (globalVelocity.x < 0 && feet.left && feet.left.id !== 0) {
+      this.velocity.x = 0;
+      this.object.position.x = feet.left.x + world.voxelSize + this.width / 2;
+    } else if (globalVelocity.x > 0 && feet.right && feet.right.id !== 0) {
+      this.velocity.x = 0;
+      this.object.position.x = feet.right.x - this.width / 2;
     }
 
-    // z casts
-    const diffZ = this.width / 2 + Math.abs(diff.z);
-    if (diff.z < 0) {
-      const raycaster = new Raycaster(this.object.position, new Vector3(-1, 0, 0), 0, diffZ);
-      const intersections = raycaster.intersectObjects(Engine.currScene.collidables);
-      console.log("Z", intersections[0]?.point);
-      if (intersections.length > 0) this.velocity.z = 0;
-    } else if (diff.z > 0) {
-      const raycaster = new Raycaster(this.object.position, new Vector3(1, 0, 0), 0, diffZ);
-      const intersections = raycaster.intersectObjects(Engine.currScene.collidables);
-      if (intersections.length > 0) this.velocity.z = 0;
+    // moving z
+    if (globalVelocity.z < 0 && feet.front && feet.front.id !== 0) {
+      this.velocity.z = 0;
+      this.object.position.z = feet.front.z + world.voxelSize + this.width / 2;
+    } else if (globalVelocity.z > 0 && feet.back && feet.back.id !== 0) {
+      this.velocity.z = 0;
+      this.object.position.z = feet.back.z - this.width / 2;
+    }
+
+    if (head.top && head.top.id !== 0) {
+      // jumping
+      if (globalVelocity.y > 0) {
+        this.velocity.y = 0;
+        this.object.position.y = head.top.y - this.height;
+      }
     }
   }
 
+  getCollidingVoxels(x: number, y: number, z: number): Neighbours<Voxel> {
+    const world = <World>Engine.currScene;
+
+    const fx = Math.floor(x);
+    const fz = Math.floor(z);
+
+    const neighbours: Neighbours<Voxel> = {
+      top: world.getVoxel(fx, y, fz),
+      left: world.getVoxel(Math.floor(this.object.position.x - this.width / 2), y, fz),
+      right: world.getVoxel(Math.floor(this.object.position.x + this.width / 2), y, fz),
+      front: world.getVoxel(fx, y, Math.floor(this.object.position.z - this.width / 2)),
+      back: world.getVoxel(fx, y, Math.floor(this.object.position.z + this.width / 2)),
+    };
+
+    return neighbours;
+  }
+
   isOnGround(delta: number): boolean {
-    const raycaster = new Raycaster(
-      this.object.position,
-      new Vector3(0, -1, 0),
-      0,
-      this.height / 2 + this.velocity.y * delta
+    const world = <World>Engine.currScene;
+
+    const vox = world.getVoxel(
+      Math.floor(this.object.position.x),
+      Math.floor(this.object.position.y - this.height / 2 - world.voxelSize / 5),
+      Math.floor(this.object.position.z)
     );
-    const intersections = raycaster.intersectObjects(Engine.currScene.collidables);
-    return intersections.length > 0;
+
+    return vox && vox.id !== 0;
   }
 }
