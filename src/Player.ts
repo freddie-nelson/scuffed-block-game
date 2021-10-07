@@ -144,16 +144,26 @@ export default class Player {
       this.object.position.z
     );
 
-    this.collideWithVoxels(feet, globalVelocity, world.voxelSize);
-    this.collideWithVoxels(head, globalVelocity, world.voxelSize);
+    this.collideWithVoxels(feet, globalVelocity, world.voxelSize, true);
+    this.collideWithVoxels(head, globalVelocity, world.voxelSize, false);
   }
 
-  private collideWithVoxels(vox: Neighbours<Voxel>, globalVelocity: Vector3, voxelSize: number) {
-    // falling
-    if (globalVelocity.y < 0 && vox.top && vox.top.id !== 0) {
+  private collideWithVoxels(
+    vox: Neighbours<Voxel>,
+    globalVelocity: Vector3,
+    voxelSize: number,
+    down: boolean
+  ) {
+    if (down && globalVelocity.y < 0 && vox.top && vox.top.id !== 0) {
       this.velocity.y = 0;
       this.object.position.y = vox.top.y + this.height;
       // console.log(this.object.position.y);
+      return;
+    }
+    if (!down && globalVelocity.y > 0 && vox.top && vox.top.id !== 0) {
+      this.velocity.y = 0;
+      this.object.position.y = vox.top.y - voxelSize;
+      return;
     }
 
     // moving x

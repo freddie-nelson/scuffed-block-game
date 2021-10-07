@@ -1,4 +1,5 @@
-import { Clock, PerspectiveCamera, Renderer, Scene as TScene, WebGLRenderer } from "three";
+import { Clock, PCFSoftShadowMap, PerspectiveCamera, Scene as TScene, WebGLRenderer } from "three";
+
 import KeyboardController from "./KeyboardController";
 import MouseController from "./MouseController";
 
@@ -9,7 +10,7 @@ export default class Engine {
   static element: HTMLCanvasElement;
   static currScene: Scene;
   static readonly renderScene = new TScene();
-  static readonly renderer: WebGLRenderer = new WebGLRenderer();
+  static readonly renderer: WebGLRenderer = new WebGLRenderer({ antialias: true });
   static camera: PerspectiveCamera;
   static readonly clock = new Clock(false);
   private static delta = 30;
@@ -22,6 +23,10 @@ export default class Engine {
     Engine.element = Engine.renderer.domElement;
     Engine.element.style.width = "";
     Engine.element.style.height = "";
+
+    // shadows
+    Engine.renderer.shadowMap.enabled = true;
+    Engine.renderer.shadowMap.type = PCFSoftShadowMap;
   }
 
   static start() {
@@ -30,6 +35,7 @@ export default class Engine {
 
     Engine.currScene.init();
     Engine.clock.start();
+
     Engine.render();
   }
 

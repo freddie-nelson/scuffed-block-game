@@ -1,7 +1,7 @@
 import Engine from "../Engine";
 import Player from "../Player";
 import Scene from "./Scene";
-import Voxel, { corners, dir, Neighbours } from "../Voxel";
+import Voxel, { corners, dir, Neighbours, VoxelType } from "../Voxel";
 import { makeNoise2D } from "fast-simplex-noise";
 import {
   BufferAttribute,
@@ -13,6 +13,8 @@ import {
   HemisphereLight,
   Mesh,
   MeshLambertMaterial,
+  MeshPhongMaterial,
+  MeshToonMaterial,
 } from "three";
 const noise = makeNoise2D();
 
@@ -20,15 +22,20 @@ export type Chunk = Voxel[][][];
 
 export default class World extends Scene {
   player: Player;
+
   skybox: Mesh;
-  chunks: Chunk[][] = [];
-  chunkSize = 10;
-  chunkHeight = 140;
-  bedrock = -40;
-  seaLevel = 0;
+  chunkMaterial = new MeshLambertMaterial({ color: "green" });
+
+  worldSize = 16;
   voxelSize = 1;
-  worldSize = 3;
+  chunkSize = 16;
+
+  chunks: Chunk[][] = [];
   chunkOffset = Math.floor(this.worldSize / 2);
+
+  chunkHeight = 150;
+  seaLevel = 0;
+  bedrock = -50;
 
   constructor(id: string) {
     super(id);
@@ -51,17 +58,22 @@ export default class World extends Scene {
     const skylight = new HemisphereLight("lightblue", "blue", 1);
     Engine.renderScene.add(skylight);
 
-    this.addLight(-1, 2, 4);
-    this.addLight(1, -1, -2);
+    this.addLight(0, this.chunkHeight, this.worldSize);
 
     this.player = new Player(0, 0, 0);
     this.player.init();
     this.generate();
   }
 
+  update(delta: number) {
+    this.player.update();
+  }
+
   private addLight(x: number, y: number, z: number) {
-    const dirLight = new DirectionalLight(0xffffff, 1);
+    const dirLight = new DirectionalLight(0xffffff, 0.3);
+
     dirLight.position.set(x, y, z);
+    dirLight.target.position.set(0, 0, 0);
     Engine.renderScene.add(dirLight);
   }
 
@@ -93,7 +105,6 @@ export default class World extends Scene {
 
         const { positions, normals, indices } = this.generateChunkGeometry(c, n);
         const geometry = new BufferGeometry();
-        const material = new MeshLambertMaterial({ color: "green", side: DoubleSide });
 
         const positionNumComponents = 3;
         const normalNumComponents = 3;
@@ -103,8 +114,11 @@ export default class World extends Scene {
         );
         geometry.setAttribute("normal", new BufferAttribute(new Float32Array(normals), normalNumComponents));
         geometry.setIndex(indices);
-        const mesh = new Mesh(geometry, material);
+        const mesh = new Mesh(geometry, this.chunkMaterial);
         mesh.position.set(c[0][0][0].x, c[0][0][0].y, c[0][0][0].z);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+
         Engine.renderScene.add(mesh);
         this.collidables.push(mesh);
       }
@@ -122,17 +136,18 @@ export default class World extends Scene {
 
   generateChunk(chunkX: number, chunkZ: number) {
     const chunk: Chunk = [];
+    const noisePosFactor = 0.01;
+    const noiseScale = 10;
 
     for (let y = this.bedrock; y < this.bedrock + this.chunkHeight; y++) {
       const slice: Voxel[][] = [];
       for (let x = chunkX; x < chunkX + this.chunkSize; x++) {
         const col: Voxel[] = [];
         for (let z = chunkZ; z < chunkZ + this.chunkSize; z++) {
-          let id = 1;
-          if (y > this.seaLevel) id = 0;
-          // let height = Math.round(y - noise(x, z) * 5);
-          // if (height < this.bedrock) height = this.bedrock;
-          // else if (height >= this.bedrock + this.chunkHeight) height = this.bedrock + this.chunkHeight - 1;
+          const n = Math.floor(noise(x * noisePosFactor, z * noisePosFactor) * noiseScale);
+
+          let id = VoxelType.GRASS;
+          if (y > this.seaLevel + n) id = VoxelType.AIR;
 
           const voxel = new Voxel(id, x, y, z);
           col.push(voxel);
@@ -249,9 +264,5 @@ export default class World extends Scene {
     }
 
     return chunk[relY][relX][relZ];
-  }
-
-  update(delta: number) {
-    this.player.update();
   }
 }
