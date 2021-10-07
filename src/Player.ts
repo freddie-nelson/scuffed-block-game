@@ -128,9 +128,8 @@ export default class Player {
   }
 
   collide(delta: number) {
-    const world = <World>Engine.currScene;
     const globalVelocity = this.object.position.clone().sub(this.lastPosition);
-    // console.log(globalVelocity);
+    const world = <World>Engine.currScene;
 
     // top is center voxel
     const feet = this.getCollidingVoxels(
@@ -145,41 +144,38 @@ export default class Player {
       this.object.position.z
     );
 
+    this.collideWithVoxels(feet, globalVelocity, world.voxelSize);
+    this.collideWithVoxels(head, globalVelocity, world.voxelSize);
+  }
+
+  private collideWithVoxels(vox: Neighbours<Voxel>, globalVelocity: Vector3, voxelSize: number) {
     // falling
-    if (globalVelocity.y < 0 && feet.top && feet.top.id !== 0) {
+    if (globalVelocity.y < 0 && vox.top && vox.top.id !== 0) {
       this.velocity.y = 0;
-      this.object.position.y = feet.top.y + this.height;
+      this.object.position.y = vox.top.y + this.height;
       // console.log(this.object.position.y);
     }
 
     // moving x
-    if (globalVelocity.x < 0 && feet.left && feet.left.id !== 0) {
+    if (globalVelocity.x < 0 && vox.left && vox.left.id !== 0) {
       this.velocity.x = 0;
-      this.object.position.x = feet.left.x + world.voxelSize + this.width / 2;
-    } else if (globalVelocity.x > 0 && feet.right && feet.right.id !== 0) {
+      this.object.position.x = vox.left.x + voxelSize + this.width / 2;
+    } else if (globalVelocity.x > 0 && vox.right && vox.right.id !== 0) {
       this.velocity.x = 0;
-      this.object.position.x = feet.right.x - this.width / 2;
+      this.object.position.x = vox.right.x - this.width / 2;
     }
 
     // moving z
-    if (globalVelocity.z < 0 && feet.front && feet.front.id !== 0) {
+    if (globalVelocity.z < 0 && vox.front && vox.front.id !== 0) {
       this.velocity.z = 0;
-      this.object.position.z = feet.front.z + world.voxelSize + this.width / 2;
-    } else if (globalVelocity.z > 0 && feet.back && feet.back.id !== 0) {
+      this.object.position.z = vox.front.z + voxelSize + this.width / 2;
+    } else if (globalVelocity.z > 0 && vox.back && vox.back.id !== 0) {
       this.velocity.z = 0;
-      this.object.position.z = feet.back.z - this.width / 2;
-    }
-
-    if (head.top && head.top.id !== 0) {
-      // jumping
-      if (globalVelocity.y > 0) {
-        this.velocity.y = 0;
-        this.object.position.y = head.top.y - this.height;
-      }
+      this.object.position.z = vox.back.z - this.width / 2;
     }
   }
 
-  getCollidingVoxels(x: number, y: number, z: number): Neighbours<Voxel> {
+  private getCollidingVoxels(x: number, y: number, z: number): Neighbours<Voxel> {
     const world = <World>Engine.currScene;
 
     const fx = Math.floor(x);
