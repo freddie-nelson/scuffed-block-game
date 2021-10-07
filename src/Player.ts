@@ -7,10 +7,10 @@ export default class Player {
   height = 2;
   width = 1;
   walkForce = 5;
-  friction = 60;
+  friction = 25;
   jumpForce = 6;
   weight = 12;
-  acceleration = 120;
+  acceleration = 80;
   velocity = new Vector3(0, 0, 0);
   lastPosition = new Vector3();
   maxVelocity = new Vector3(5, 20, 5);
@@ -82,6 +82,7 @@ export default class Player {
     // this.velocity.z *= this.direction.z * Math.sign(this.velocity.z);
 
     // apply friction
+    const friction = this.friction * (isOnGround ? 1 : 0.05);
     const sign = {
       x: Math.sign(this.velocity.x),
       y: Math.sign(this.velocity.y),
@@ -89,11 +90,11 @@ export default class Player {
     };
 
     if (!moveL && !moveR) {
-      this.velocity.x -= sign.x * this.friction * delta;
+      this.velocity.x -= sign.x * friction * delta;
       if (Math.sign(this.velocity.x) !== sign.x) this.velocity.x = 0;
     }
     if (!moveF && !moveB) {
-      this.velocity.z -= sign.z * this.friction * delta;
+      this.velocity.z -= sign.z * friction * delta;
       if (Math.sign(this.velocity.z) !== sign.z) this.velocity.z = 0;
     }
 
@@ -121,7 +122,6 @@ export default class Player {
     this.object.position.y += this.velocity.y * delta;
     Engine.camera.position.copy(this.object.position).add(this.cameraPos);
 
-    // update camera position then move player to camera
     Engine.mouseController.controls.moveRight(this.velocity.x * delta);
     Engine.mouseController.controls.moveForward(this.velocity.z * delta);
     this.object.position.copy(Engine.camera.position).sub(this.cameraPos);
@@ -167,13 +167,16 @@ export default class Player {
     }
 
     // moving x
+    let collide = false;
     if (globalVelocity.x < 0 && vox.left && vox.left.id !== 0) {
       this.velocity.x = 0;
       this.object.position.x = vox.left.x + voxelSize + this.width / 2;
     } else if (globalVelocity.x > 0 && vox.right && vox.right.id !== 0) {
       this.velocity.x = 0;
       this.object.position.x = vox.right.x - this.width / 2;
+      collide = true;
     }
+    console.log(collide, this.velocity.x, globalVelocity.x);
 
     // moving z
     if (globalVelocity.z < 0 && vox.front && vox.front.id !== 0) {

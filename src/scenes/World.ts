@@ -26,7 +26,7 @@ export default class World extends Scene {
   skybox: Mesh;
   chunkMaterial = new MeshLambertMaterial({ color: "green" });
 
-  worldSize = 16;
+  worldSize = 4;
   voxelSize = 1;
   chunkSize = 16;
 
