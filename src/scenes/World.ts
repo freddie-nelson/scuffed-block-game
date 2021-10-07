@@ -203,7 +203,7 @@ export default class World extends Scene {
     cNeighbours: Neighbours<Chunk>
   ) {
     const voxel = chunk[y][x][z];
-    if (voxel.id === 0)
+    if (voxel.id === VoxelType.AIR)
       return {
         position: [],
         normal: [],

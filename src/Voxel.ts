@@ -61,13 +61,21 @@ export const dir: { [index: string]: number[] } = {
   front: [1, 0, 0],
 };
 
+export enum VoxelType {
+  AIR,
+  GRASS,
+  DIRT,
+  STONE,
+  WOOD,
+}
+
 export default class Voxel {
-  id = 0;
+  id = VoxelType.AIR;
   x: number;
   y: number;
   z: number;
 
-  constructor(id: number, x: number, y: number, z: number) {
+  constructor(id: VoxelType, x: number, y: number, z: number) {
     this.id = id;
     this.x = x;
     this.y = y;
