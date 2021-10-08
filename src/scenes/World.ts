@@ -1,7 +1,7 @@
 import Engine from "../Engine";
 import Player from "../Player";
 import Scene from "./Scene";
-import Voxel, { corners, dir, Neighbours, VoxelType } from "../Voxel";
+import Voxel, { faces, Neighbours, VoxelType } from "../Voxel";
 import { makeNoise2D } from "fast-simplex-noise";
 import {
   BufferAttribute,
@@ -15,6 +15,9 @@ import {
   MeshLambertMaterial,
   MeshPhongMaterial,
   MeshToonMaterial,
+  NearestFilter,
+  Texture,
+  TextureLoader,
 } from "three";
 const noise = makeNoise2D();
 
@@ -24,7 +27,11 @@ export default class World extends Scene {
   player: Player;
 
   skybox: Mesh;
-  chunkMaterial = new MeshLambertMaterial({ color: "green" });
+  tileTextures: Texture;
+  chunkMaterial: MeshLambertMaterial;
+  tileSize = 16;
+  tileTextureWidth = 16;
+  tileTextureHeight = 48;
 
   worldSize = 4;
   voxelSize = 1;
@@ -62,6 +69,16 @@ export default class World extends Scene {
 
     this.player = new Player(0, 0, 0);
     this.player.init();
+
+    const loader = new TextureLoader();
+    const texture = loader.load("assets/textures/grass.png");
+    texture.magFilter = NearestFilter;
+    texture.minFilter = NearestFilter;
+    this.tileTextures = texture;
+
+    this.chunkMaterial = new MeshLambertMaterial({
+      map: this.tileTextures,
+    });
     this.generate();
   }
 
@@ -103,16 +120,18 @@ export default class World extends Scene {
         const c = this.chunks[y][x];
         const n = this.getChunkNeighbours(x, y);
 
-        const { positions, normals, indices } = this.generateChunkGeometry(c, n);
+        const { positions, normals, indices, uvs } = this.generateChunkGeometry(c, n);
         const geometry = new BufferGeometry();
 
         const positionNumComponents = 3;
         const normalNumComponents = 3;
+        const uvNumComponents = 2;
         geometry.setAttribute(
           "position",
           new BufferAttribute(new Float32Array(positions), positionNumComponents)
         );
         geometry.setAttribute("normal", new BufferAttribute(new Float32Array(normals), normalNumComponents));
+        geometry.setAttribute("uv", new BufferAttribute(new Float32Array(uvs), uvNumComponents));
         geometry.setIndex(indices);
         const mesh = new Mesh(geometry, this.chunkMaterial);
         mesh.position.set(c[0][0][0].x, c[0][0][0].y, c[0][0][0].z);
@@ -166,13 +185,14 @@ export default class World extends Scene {
     const positions: number[] = [];
     const normals: number[] = [];
     const indices: number[] = [];
+    const uvs: number[] = [];
 
     for (let y = 0; y < chunk.length; y++) {
       for (let x = 0; x < chunk[y].length; x++) {
         const slice = chunk[y][x];
 
         for (let z = 0; z < slice.length; z++) {
-          const { position, normal, index } = this.generateVoxelGeometry(
+          const { position, normal, index, uv } = this.generateVoxelGeometry(
             x,
             y,
             z,
@@ -183,6 +203,7 @@ export default class World extends Scene {
           positions.push(...position);
           normals.push(...normal);
           indices.push(...index);
+          uvs.push(...uv);
         }
       }
     }
@@ -191,6 +212,7 @@ export default class World extends Scene {
       positions,
       normals,
       indices,
+      uvs,
     };
   }
 
@@ -208,6 +230,7 @@ export default class World extends Scene {
         position: [],
         normal: [],
         index: [],
+        uv: [],
       }; // empty
 
     const neighbours = voxel.getNeighbours(chunk, cNeighbours);
@@ -215,15 +238,21 @@ export default class World extends Scene {
     const position: number[] = [];
     const normal: number[] = [];
     const index: number[] = [];
+    const uv: number[] = [];
 
     Object.keys(neighbours).forEach((k) => {
       const n = neighbours[k];
       if (!n || n.id === 0) {
         const ndx = (posLength + position.length) / 3;
 
-        for (const pos of corners[k]) {
-          position.push(pos[0] + x, pos[1] + y, pos[2] + z);
-          normal.push(...dir[k]);
+        for (const corner of faces[k].corners) {
+          position.push(corner.pos[0] + x, corner.pos[1] + y, corner.pos[2] + z);
+          normal.push(...faces[k].dir);
+
+          uv.push(
+            ((voxel.id - 1 + corner.uv[0]) * this.tileSize) / this.tileTextureWidth,
+            1 - ((faces[k].uvRow + 1 - corner.uv[1]) * this.tileSize) / this.tileTextureHeight
+          );
         }
 
         index.push(ndx, ndx + 1, ndx + 2, ndx + 2, ndx + 1, ndx + 3);
@@ -234,6 +263,7 @@ export default class World extends Scene {
       position,
       normal,
       index,
+      uv,
     };
   }
 

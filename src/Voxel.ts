@@ -9,56 +9,80 @@ export interface Neighbours<T> {
   top?: T;
   front?: T;
   back?: T;
+  fl?: T;
+  fr?: T;
+  bl?: T;
+  br?: T;
 }
 
-// corners for face geometry
-export const corners: { [index: string]: number[][] } = {
-  left: [
-    [0, 1, 0],
-    [0, 0, 0],
-    [0, 1, 1],
-    [0, 0, 1],
-  ],
-  right: [
-    [1, 1, 1],
-    [1, 0, 1],
-    [1, 1, 0],
-    [1, 0, 0],
-  ],
-  bottom: [
-    [1, 0, 1],
-    [0, 0, 1],
-    [1, 0, 0],
-    [0, 0, 0],
-  ],
-  top: [
-    [0, 1, 1],
-    [1, 1, 1],
-    [0, 1, 0],
-    [1, 1, 0],
-  ],
-  back: [
-    [1, 0, 0],
-    [0, 0, 0],
-    [1, 1, 0],
-    [0, 1, 0],
-  ],
-  front: [
-    [0, 0, 1],
-    [1, 0, 1],
-    [0, 1, 1],
-    [1, 1, 1],
-  ],
-};
+export interface Face {
+  uvRow: number;
+  dir: number[];
+  corners: { pos: number[]; uv: number[] }[];
+}
 
-// dir for face geometry
-export const dir: { [index: string]: number[] } = {
-  left: [0, 0, -1],
-  right: [0, 0, 1],
-  bottom: [0, -1, 0],
-  top: [0, 1, 0],
-  back: [-1, 0, 0],
-  front: [1, 0, 0],
+// face geometry
+export const faces: { [index: string]: Face } = {
+  left: {
+    uvRow: 1,
+    dir: [0, 0, -1],
+    corners: [
+      { pos: [0, 1, 0], uv: [0, 1] },
+      { pos: [0, 0, 0], uv: [0, 0] },
+      { pos: [0, 1, 1], uv: [1, 1] },
+      { pos: [0, 0, 1], uv: [1, 0] },
+    ],
+  },
+  right: {
+    uvRow: 1,
+    dir: [0, 0, 1],
+    corners: [
+      { pos: [1, 1, 1], uv: [0, 1] },
+      { pos: [1, 0, 1], uv: [0, 0] },
+      { pos: [1, 1, 0], uv: [1, 1] },
+      { pos: [1, 0, 0], uv: [1, 0] },
+    ],
+  },
+  bottom: {
+    uvRow: 2,
+    dir: [0, -1, 0],
+    corners: [
+      { pos: [1, 0, 1], uv: [1, 0] },
+      { pos: [0, 0, 1], uv: [0, 0] },
+      { pos: [1, 0, 0], uv: [1, 1] },
+      { pos: [0, 0, 0], uv: [0, 1] },
+    ],
+  },
+  top: {
+    uvRow: 0,
+    dir: [0, 1, 0],
+    corners: [
+      { pos: [0, 1, 1], uv: [1, 1] },
+      { pos: [1, 1, 1], uv: [0, 1] },
+      { pos: [0, 1, 0], uv: [1, 0] },
+      { pos: [1, 1, 0], uv: [0, 0] },
+    ],
+  },
+  back: {
+    uvRow: 1,
+    dir: [-1, 0, 0],
+    corners: [
+      { pos: [1, 0, 0], uv: [0, 0] },
+      { pos: [0, 0, 0], uv: [1, 0] },
+      { pos: [1, 1, 0], uv: [0, 1] },
+      { pos: [0, 1, 0], uv: [1, 1] },
+    ],
+  },
+  front: {
+    uvRow: 1,
+    dir: [1, 0, 0],
+    corners: [
+      { pos: [0, 0, 1], uv: [0, 0] },
+      { pos: [1, 0, 1], uv: [1, 0] },
+      { pos: [0, 1, 1], uv: [0, 1] },
+      { pos: [1, 1, 1], uv: [1, 1] },
+    ],
+  },
 };
 
 export enum VoxelType {

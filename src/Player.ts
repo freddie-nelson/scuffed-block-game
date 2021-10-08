@@ -8,8 +8,8 @@ export default class Player {
   width = 1;
   walkForce = 5;
   friction = 25;
-  jumpForce = 6;
-  weight = 12;
+  jumpForce = 6.8;
+  weight = 20;
   acceleration = 80;
   velocity = new Vector3(0, 0, 0);
   lastPosition = new Vector3();
@@ -46,31 +46,38 @@ export default class Player {
     let moveL = false;
     let moveR = false;
     const isOnGround = this.isOnGround(delta);
-    const acceleration = this.acceleration * (isOnGround ? 1 : 0.1);
+    let acceleration = this.acceleration * (isOnGround ? 1 : 0.1);
+    let maxVelocity = this.maxVelocity.clone();
+
+    // sprint
+    if (keyController.isKeyPressed("ShiftLeft")) {
+      acceleration *= 1.2;
+      maxVelocity.multiplyScalar(1.5);
+    }
 
     if (keyController.isKeyPressed("KeyW")) {
       moveF = true;
       this.velocity.z += acceleration * delta;
-      if (Math.abs(this.velocity.z) > this.maxVelocity.z)
-        this.velocity.z = this.maxVelocity.z * Math.sign(this.velocity.z);
+      if (Math.abs(this.velocity.z) > maxVelocity.z)
+        this.velocity.z = maxVelocity.z * Math.sign(this.velocity.z);
     }
     if (keyController.isKeyPressed("KeyS")) {
       moveB = true;
       this.velocity.z -= acceleration * delta;
-      if (Math.abs(this.velocity.z) > this.maxVelocity.z)
-        this.velocity.z = this.maxVelocity.z * Math.sign(this.velocity.z);
+      if (Math.abs(this.velocity.z) > maxVelocity.z)
+        this.velocity.z = maxVelocity.z * Math.sign(this.velocity.z);
     }
     if (keyController.isKeyPressed("KeyA")) {
       moveL = true;
       this.velocity.x -= acceleration * delta;
-      if (Math.abs(this.velocity.x) > this.maxVelocity.x)
-        this.velocity.x = this.maxVelocity.x * Math.sign(this.velocity.x);
+      if (Math.abs(this.velocity.x) > maxVelocity.x)
+        this.velocity.x = maxVelocity.x * Math.sign(this.velocity.x);
     }
     if (keyController.isKeyPressed("KeyD")) {
       moveR = true;
       this.velocity.x += acceleration * delta;
-      if (Math.abs(this.velocity.x) > this.maxVelocity.x)
-        this.velocity.x = this.maxVelocity.x * Math.sign(this.velocity.x);
+      if (Math.abs(this.velocity.x) > maxVelocity.x)
+        this.velocity.x = maxVelocity.x * Math.sign(this.velocity.x);
     }
 
     // ensure consistent movement in all directions
@@ -169,26 +176,74 @@ export default class Player {
       return;
     }
 
+    let left = false;
+    let right = false;
+    let front = false;
+    let back = false;
+
     // moving x
-    // let collide = false;
     if (globalVelocity.x < 0 && vox.left && vox.left.id !== 0) {
+      left = true;
       this.velocity.x = 0;
       this.object.position.x = vox.left.x + voxelSize + this.width / 2;
     } else if (globalVelocity.x > 0 && vox.right && vox.right.id !== 0) {
+      right = true;
       this.velocity.x = 0;
       this.object.position.x = vox.right.x - this.width / 2;
-      // collide = true;
     }
     // console.log(collide, this.velocity.x, globalVelocity.x);
 
     // moving z
     if (globalVelocity.z < 0 && vox.front && vox.front.id !== 0) {
+      front = true;
       this.velocity.z = 0;
       this.object.position.z = vox.front.z + voxelSize + this.width / 2;
     } else if (globalVelocity.z > 0 && vox.back && vox.back.id !== 0) {
+      back = true;
       this.velocity.z = 0;
       this.object.position.z = vox.back.z - this.width / 2;
     }
+
+    // diagonals
+    // if (!front && !left && (globalVelocity.z < 0 || globalVelocity.x < 0) && vox.fl && vox.fl.id !== 0) {
+    //   this.velocity.z = 0;
+    //   this.velocity.x = 0;
+    //   this.object.position.z = vox.fl.z + voxelSize + this.width / 2;
+    //   this.object.position.x = vox.fl.x + voxelSize + this.width / 2;
+    // } else if (
+    //   !front &&
+    //   !right &&
+    //   (globalVelocity.z < 0 || globalVelocity.x > 0) &&
+    //   vox.fr &&
+    //   vox.fr.id !== 0
+    // ) {
+    //   this.velocity.z = 0;
+    //   this.velocity.x = 0;
+    //   this.object.position.z = vox.fr.z + voxelSize + this.width / 2;
+    //   this.object.position.x = vox.fr.x - this.width / 2;
+    // } else if (
+    //   !back &&
+    //   !left &&
+    //   (globalVelocity.z > 0 || globalVelocity.x < 0) &&
+    //   vox.bl &&
+    //   vox.bl.id !== 0
+    // ) {
+    //   this.velocity.z = 0;
+    //   this.velocity.x = 0;
+    //   this.object.position.x = vox.bl.z - this.width / 2;
+    //   this.object.position.z = vox.bl.x + voxelSize + this.width / 2;
+    // } else if (
+    //   !back &&
+    //   !right &&
+    //   (globalVelocity.z > 0 || globalVelocity.x > 0) &&
+    //   vox.br &&
+    //   vox.br.id !== 0
+    // ) {
+    //   this.velocity.z = 0;
+    //   this.velocity.x = 0;
+    //   this.object.position.x = vox.br.z - this.width / 2;
+    //   this.object.position.z = vox.br.z - this.width / 2;
+    // }
   }
 
   private getCollidingVoxels(x: number, y: number, z: number): Neighbours<Voxel> {
@@ -203,6 +258,26 @@ export default class Player {
       right: world.getVoxel(Math.floor(this.object.position.x + this.width / 2), y, fz),
       front: world.getVoxel(fx, y, Math.floor(this.object.position.z - this.width / 2)),
       back: world.getVoxel(fx, y, Math.floor(this.object.position.z + this.width / 2)),
+      fl: world.getVoxel(
+        Math.floor(this.object.position.x - this.width / 2),
+        y,
+        Math.floor(this.object.position.z - this.width / 2)
+      ),
+      fr: world.getVoxel(
+        Math.floor(this.object.position.x + this.width / 2),
+        y,
+        Math.floor(this.object.position.z - this.width / 2)
+      ),
+      bl: world.getVoxel(
+        Math.floor(this.object.position.x - this.width / 2),
+        y,
+        Math.floor(this.object.position.z + this.width / 2)
+      ),
+      br: world.getVoxel(
+        Math.floor(this.object.position.x + this.width / 2),
+        y,
+        Math.floor(this.object.position.z + this.width / 2)
+      ),
     };
 
     return neighbours;
