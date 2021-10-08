@@ -11,6 +11,7 @@
   "devDependencies": {
     "@types/node": "^16.10.1",
     "@types/noisejs": "^0.0.28",
+    "@types/seedrandom": "^3.0.1",
     "@types/three": "^0.132.2",
     "nodemon": "^2.0.13",
     "ts-loader": "^8.1.0",
@@ -23,6 +24,7 @@
   "license": "ISC",
   "dependencies": {
     "fast-simplex-noise": "^4.0.0",
+    "seedrandom": "^3.0.5",
     "three": "^0.133.1"
   }
 }

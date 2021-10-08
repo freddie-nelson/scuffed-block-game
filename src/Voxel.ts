@@ -92,6 +92,7 @@ export enum VoxelType {
   LOG,
   WOOD,
   STONE,
+  LEAVES,
 }
 
 export default class Voxel {
@@ -129,5 +130,17 @@ export default class Voxel {
     // console.log(neighbours);
 
     return neighbours;
+  }
+
+  getChunk() {
+    const world = <World>Engine.currScene;
+    const chunkX = Math.floor(this.x / world.chunkSize + world.chunkOffset);
+    const chunkY = Math.floor(this.z / world.chunkSize + world.chunkOffset);
+
+    return {
+      chunk: world.chunks[chunkY][chunkX],
+      chunkX,
+      chunkY,
+    };
   }
 }

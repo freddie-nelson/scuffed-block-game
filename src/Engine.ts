@@ -1,5 +1,8 @@
 import { Clock, PCFSoftShadowMap, PerspectiveCamera, Scene as TScene, WebGLRenderer } from "three";
 
+import sr from "seedrandom";
+const seedrandom: sr = require("seedrandom");
+
 import KeyboardController from "./KeyboardController";
 import MouseController from "./MouseController";
 
@@ -16,6 +19,7 @@ export default class Engine {
   private static delta = 30;
   static readonly mouseController = new MouseController();
   static readonly keyController = new KeyboardController();
+  static random: ReturnType<sr.Callback>;
 
   constructor(element: HTMLCanvasElement) {
     Engine.renderer.setSize(window.innerWidth, window.innerHeight);
@@ -23,6 +27,9 @@ export default class Engine {
     Engine.element = Engine.renderer.domElement;
     Engine.element.style.width = "";
     Engine.element.style.height = "";
+
+    // init random number generator
+    Engine.random = seedrandom();
 
     // shadows
     // Engine.renderer.shadowMap.enabled = true;
