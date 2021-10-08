@@ -4,6 +4,7 @@ import {
   Color,
   CubeTextureLoader,
   DirectionalLight,
+  Fog,
   HemisphereLight,
   Material,
   Mesh,
@@ -80,7 +81,15 @@ export default class World extends Scene {
     const skylight = new HemisphereLight("lightblue", "white", 0.5);
     Engine.renderScene.add(skylight);
 
-    this.addLight(0, this.chunkHeight, this.worldSize);
+    // sun
+    this.addLight(0, this.seaLevel + 200, this.worldSize);
+
+    // fog
+    Engine.renderScene.fog = new Fog(
+      Engine.renderScene.background,
+      this.chunkSize,
+      (this.renderDist * this.chunkSize) / 2
+    );
 
     this.player = new Player(0, 0, 0);
     this.player.init();
