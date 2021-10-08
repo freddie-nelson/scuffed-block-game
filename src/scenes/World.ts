@@ -32,8 +32,8 @@ export default class World extends Scene {
   tileTextureWidth = 48;
   tileTextureHeight = 96;
 
-  worldSize = 256;
-  renderDist = 3;
+  worldSize = 512;
+  renderDist = 6;
   voxelSize = 1;
   chunkSize = 8;
 
@@ -211,7 +211,15 @@ export default class World extends Scene {
 
       // trunks pass
       this.forEachVoxel(chunk, (vox, relX, relY, relZ) => {
-        if (vox.y < this.cavernLevel) return;
+        // TODO properly fix mesh generation for trees on chunk borders
+        if (
+          vox.y < this.cavernLevel ||
+          relX === 0 ||
+          relX === this.chunkSize - 1 ||
+          relZ === 0 ||
+          relZ === this.chunkSize - 1
+        )
+          return;
 
         const { tOff } = this.getTerrainNoise(vox.x, vox.z);
         if (vox.y > this.seaLevel + tOff + treeHeight) return;
@@ -221,7 +229,7 @@ export default class World extends Scene {
           tOff < treeUpperRange &&
           vox.y === this.seaLevel + tOff + 1 &&
           chunk[relY - 1][relX][relZ].id === VoxelType.GRASS &&
-          Math.random() < 0.015
+          Math.random() < 0.018
         ) {
           vox.id = VoxelType.LOG;
         } else if (
