@@ -5,7 +5,7 @@ import Voxel, { Neighbours } from "./Voxel";
 
 export default class Player {
   height = 2;
-  width = 1;
+  width = 0.8;
   walkForce = 5;
   friction = 25;
   jumpForce = 6.8;

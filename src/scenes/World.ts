@@ -40,7 +40,7 @@ export default class World extends Scene {
 
   chunkHeight = 150;
   seaLevel = 0;
-  cavernLevel = -15;
+  cavernLevel = -12;
   bedrock = -50;
 
   noise: ReturnType<typeof makeNoise2D>;
@@ -172,13 +172,16 @@ export default class World extends Scene {
       for (let x = chunkX; x < chunkX + this.chunkSize; x++) {
         const col: Voxel[] = [];
         for (let z = chunkZ; z < chunkZ + this.chunkSize; z++) {
-          const { n, n2, tOff } = this.getTerrainNoise(x, z);
+          const { tOff } = this.getTerrainNoise(x, z);
 
           // world cake layers
           let id = VoxelType.DIRT;
-          if (y < this.cavernLevel + tOff + Math.floor(Math.random() * 7)) id = VoxelType.STONE;
-          else if (y === this.seaLevel + tOff) id = VoxelType.GRASS;
+          if (y === this.seaLevel + tOff) id = VoxelType.GRASS;
           else if (y > this.seaLevel + tOff) id = VoxelType.AIR;
+
+          // bleed cavern layer into dirt
+          if (y < this.cavernLevel + Math.floor(Math.random() * 7) && id !== VoxelType.AIR)
+            id = VoxelType.STONE;
 
           const voxel = new Voxel(id, x, y, z);
           col.push(voxel);
@@ -197,13 +200,21 @@ export default class World extends Scene {
     const treeHeight = 5;
     const treeHeightDiff = -1;
     const treeScaleChance = 0.2;
+    const treeUpperRange = -this.noiseScale / 6;
+    const treeLowerRange = -this.noiseScale / 1.3;
 
     this.forEachChunk((chunk, chunkX, chunkY) => {
       // trunks pass
       this.forEachVoxel(chunk, (vox, relX, relY, relZ) => {
         const { tOff } = this.getTerrainNoise(vox.x, vox.z);
 
-        if (vox.y === this.seaLevel + tOff + 1 && tOff < -this.noiseScale / 3 && Math.random() < 0.015) {
+        if (
+          vox.y === this.seaLevel + tOff + 1 &&
+          chunk[relY - 1][relX][relZ].id === VoxelType.GRASS &&
+          tOff > treeLowerRange &&
+          tOff < treeUpperRange &&
+          Math.random() < 0.015
+        ) {
           vox.id = VoxelType.LOG;
         } else if (
           vox.id === VoxelType.AIR &&
