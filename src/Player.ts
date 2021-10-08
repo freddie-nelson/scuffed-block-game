@@ -150,7 +150,7 @@ export default class Player {
 
     const head = this.getCollidingVoxels(
       this.object.position.x,
-      Math.floor(this.object.position.y + this.height / 2),
+      Math.floor(this.object.position.y + this.height / 2 - world.voxelSize / 10),
       this.object.position.z
     );
 
@@ -173,6 +173,7 @@ export default class Player {
     if (!down && globalVelocity.y > 0 && vox.top && vox.top.id !== 0) {
       this.velocity.y = 0;
       this.object.position.y = vox.top.y - voxelSize;
+
       return;
     }
 
