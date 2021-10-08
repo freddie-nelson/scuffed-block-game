@@ -1,8 +1,3 @@
-import Engine from "../Engine";
-import Player from "../Player";
-import Scene from "./Scene";
-import Voxel, { faces, Neighbours, VoxelType } from "../Voxel";
-import { makeNoise2D } from "fast-simplex-noise";
 import {
   BufferAttribute,
   BufferGeometry,
@@ -18,11 +13,22 @@ import {
   TextureLoader,
 } from "three";
 
-// const noise2 = makeNoise2D(Engine.random);
+import { makeNoise2D } from "fast-simplex-noise";
+
+import sr from "seedrandom";
+const seedrandom: sr = require("seedrandom");
+
+import Engine from "../Engine";
+import Player from "../Player";
+import Scene from "./Scene";
+import Voxel, { faces, Neighbours, VoxelType } from "../Voxel";
 
 export type Chunk = Voxel[][][];
 
 export default class World extends Scene {
+  seed: number;
+  random: ReturnType<sr.Callback>;
+
   player: Player;
 
   skybox: Mesh;
@@ -33,7 +39,7 @@ export default class World extends Scene {
   tileTextureHeight = 96;
 
   worldSize = 512;
-  renderDist = 6;
+  renderDist = 8;
   voxelSize = 1;
   chunkSize = 8;
 
@@ -47,6 +53,7 @@ export default class World extends Scene {
   chunkHeight = 80;
   seaLevel = 0;
   cavernLevel = -12;
+  cavernBleed = 7;
   bedrock = -30;
 
   noise: ReturnType<typeof makeNoise2D>;
@@ -55,11 +62,16 @@ export default class World extends Scene {
   noiseScale = 8;
   noise2Scale = 4;
 
+  noiseCache: { [index: string]: { n: number; n2: number; tOff: number } } = {};
+
   constructor(id: string) {
     super(id);
 
-    this.noise = makeNoise2D(Engine.random);
-    this.noise2 = makeNoise2D(Engine.random);
+    this.seed = 3;
+
+    this.random = seedrandom(String(this.seed));
+    this.noise = makeNoise2D(this.random);
+    this.noise2 = makeNoise2D(this.random);
   }
 
   init() {
@@ -115,10 +127,6 @@ export default class World extends Scene {
   }
 
   generate(centerX: number, centerY: number) {
-    let chunksGenerated = 0;
-
-    console.log(centerX, centerY);
-
     const limits = {
       lowerX: centerX - this.chunkRenderOffset,
       iterationsY: this.renderDist,
@@ -128,34 +136,41 @@ export default class World extends Scene {
 
     // generate chunk data
     let timer = performance.now();
+    let chunksGenerated = 0;
     console.log("Generating chunks...");
     this.forEachChunk(limits, (chunk, x, y) => {
       if (this.generated[y][x]) return;
 
-      const c = this.generateChunk(
-        (x - this.chunkOffset) * this.chunkSize,
-        (y - this.chunkOffset) * this.chunkSize
-      );
+      const chunkX = (x - this.chunkOffset) * this.chunkSize;
+      const chunkZ = (y - this.chunkOffset) * this.chunkSize;
+
+      this.fillNoiseCache(chunkX, chunkZ);
+
+      const c = this.generateChunk(chunkX, chunkZ);
+
+      this.generateTrees(c, x, y);
+
       this.chunks[y][x] = c;
+      this.generated[y][x] = true;
       chunksGenerated++;
     });
     console.log(`Generated ${chunksGenerated} chunks in ${performance.now() - timer}ms.`);
-
-    timer = performance.now();
-    console.log("Growing trees...");
-    this.generateTrees(limits);
-    console.log(`Trees grown in ${performance.now() - timer}ms.`);
-
-    // mark all chunks from this pass as generated
-    this.forEachChunk(limits, (chunk, x, y) => {
-      this.generated[y][x] = true;
-    });
 
     // generate chunk meshes
     timer = performance.now();
     console.log("Creating mesh...");
     this.generateMesh(limits);
     console.log(`Finished creating mesh in ${performance.now() - timer}ms.`);
+  }
+
+  fillNoiseCache(startX: number, startZ: number) {
+    this.noiseCache = {};
+
+    for (let x = startX; x < startX + this.chunkSize; x++) {
+      for (let z = startZ; z < startZ + this.chunkSize; z++) {
+        this.noiseCache[`${x} ${z}`] = this.getTerrainNoise(x, z);
+      }
+    }
   }
 
   getChunkNeighbours(x: number, y: number) {
@@ -175,7 +190,7 @@ export default class World extends Scene {
       for (let x = chunkX; x < chunkX + this.chunkSize; x++) {
         const col: Voxel[] = [];
         for (let z = chunkZ; z < chunkZ + this.chunkSize; z++) {
-          const { tOff } = this.getTerrainNoise(x, z);
+          const { tOff } = this.noiseCache[`${x} ${z}`];
 
           // world cake layers
           let id = VoxelType.DIRT;
@@ -183,7 +198,7 @@ export default class World extends Scene {
           else if (y > this.seaLevel + tOff) id = VoxelType.AIR;
 
           // bleed cavern layer into dirt
-          if (y < this.cavernLevel + Math.floor(Math.random() * 7) && id !== VoxelType.AIR)
+          if (y < this.cavernLevel + Math.floor(this.random() * this.cavernBleed) && id !== VoxelType.AIR)
             id = VoxelType.STONE;
 
           const voxel = new Voxel(id, x, y, z);
@@ -199,100 +214,92 @@ export default class World extends Scene {
     return chunk;
   }
 
-  generateTrees(limits: { lowerX: number; iterationsX: number; lowerY: number; iterationsY: number }) {
+  generateTrees(chunk: Chunk, chunkX: number, chunkY: number) {
     const treeHeight = 5;
     const treeHeightDiff = -1;
     const treeScaleChance = 0.2;
     const treeUpperRange = -this.noiseScale / 6;
     const treeLowerRange = -this.noiseScale / 1.3;
 
-    this.forEachChunk(limits, (chunk, chunkX, chunkY) => {
-      if (this.generated[chunkY][chunkX]) return;
+    // trunks pass
+    this.forEachVoxel(chunk, (vox, relX, relY, relZ) => {
+      // TODO properly fix mesh generation for trees on chunk borders
+      const { tOff } = this.noiseCache[`${vox.x} ${vox.z}`];
+      if (
+        vox.y < this.seaLevel + tOff + 1 ||
+        vox.y > this.seaLevel + tOff + treeHeight + (this.random() < treeScaleChance ? treeHeightDiff : 0) ||
+        relX === 0 ||
+        relX === this.chunkSize - 1 ||
+        relZ === 0 ||
+        relZ === this.chunkSize - 1
+      )
+        return;
 
-      // trunks pass
-      this.forEachVoxel(chunk, (vox, relX, relY, relZ) => {
-        // TODO properly fix mesh generation for trees on chunk borders
-        if (
-          vox.y < this.cavernLevel ||
-          relX === 0 ||
-          relX === this.chunkSize - 1 ||
-          relZ === 0 ||
-          relZ === this.chunkSize - 1
-        )
-          return;
+      if (
+        tOff > treeLowerRange &&
+        tOff < treeUpperRange &&
+        vox.y === this.seaLevel + tOff + 1 &&
+        chunk[relY - 1][relX][relZ].id === VoxelType.GRASS &&
+        this.random() < 0.018
+      ) {
+        vox.id = VoxelType.LOG;
+      } else if (vox.id === VoxelType.AIR && chunk[relY - 1][relX][relZ].id === VoxelType.LOG) {
+        vox.id = VoxelType.LOG;
+      }
+    });
 
-        const { tOff } = this.getTerrainNoise(vox.x, vox.z);
-        if (vox.y > this.seaLevel + tOff + treeHeight) return;
+    // leaves pass
+    this.forEachVoxel(chunk, (vox, relX, relY, relZ) => {
+      const { tOff } = this.noiseCache[`${vox.x} ${vox.z}`];
+      if (vox.y < this.cavernLevel || vox.y > this.seaLevel + tOff + treeHeight) return;
 
-        if (
-          tOff > treeLowerRange &&
-          tOff < treeUpperRange &&
-          vox.y === this.seaLevel + tOff + 1 &&
-          chunk[relY - 1][relX][relZ].id === VoxelType.GRASS &&
-          Math.random() < 0.018
-        ) {
-          vox.id = VoxelType.LOG;
-        } else if (
-          vox.id === VoxelType.AIR &&
-          vox.y > this.seaLevel + tOff + 1 &&
-          vox.y <=
-            this.seaLevel + tOff + (treeHeight + (Math.random() < treeScaleChance ? treeHeightDiff : 0)) &&
-          chunk[relY - 1][relX][relZ].id === VoxelType.LOG
-        ) {
-          vox.id = VoxelType.LOG;
+      if (vox.id === VoxelType.LOG) {
+        let logsBelow = 0;
+        let y = relY - 1;
+        while (chunk[y][relX][relZ].id === VoxelType.LOG) {
+          logsBelow++;
+          y--;
         }
-      });
 
-      // leaves pass
-      this.forEachVoxel(chunk, (vox, relX, relY, relZ) => {
-        if (vox.id === VoxelType.LOG) {
-          let logsBelow = 0;
-          let y = relY - 1;
-          while (chunk[y][relX][relZ].id === VoxelType.LOG) {
-            logsBelow++;
-            y--;
-          }
+        // place leaves around top of tree
+        if (logsBelow >= 2) {
+          const chunkNeighbours = this.getChunkNeighbours(chunkX, chunkY);
+          const neighbours = vox.getNeighbours(chunk, chunkNeighbours);
 
-          // place leaves around top of tree
-          if (logsBelow >= 2) {
-            const chunkNeighbours = this.getChunkNeighbours(chunkX, chunkY);
-            const neighbours = vox.getNeighbours(chunk, chunkNeighbours);
+          // side leaves
+          Object.keys(neighbours).forEach((k) => {
+            if (!neighbours[k] || k === "top" || k === "bottom") return;
 
-            // side leaves
-            Object.keys(neighbours).forEach((k) => {
-              if (!neighbours[k] || k === "top" || k === "bottom") return;
-
-              neighbours[k].id = VoxelType.LEAVES;
-              const { chunk: c, chunkX: cX, chunkY: cY } = neighbours[k].getChunk();
-              let nextNeighbours;
-              if (cX !== chunkX || cY !== chunkY) {
-                nextNeighbours = neighbours[k].getNeighbours(c, this.getChunkNeighbours(cX, cY));
-              } else {
-                nextNeighbours = neighbours[k].getNeighbours(chunk, chunkNeighbours);
-              }
-
-              // if (nextNeighbours[k]) nextNeighbours[k].id = VoxelType.LEAVES;
-
-              // fill in gaps
-              if (k === "left" || k === "right") {
-                if (nextNeighbours.front) nextNeighbours.front.id = VoxelType.LEAVES;
-                if (nextNeighbours.back) nextNeighbours.back.id = VoxelType.LEAVES;
-              }
-            });
-
-            // top
-            if (neighbours.top && neighbours.top.id === VoxelType.AIR) {
-              neighbours.top.id = VoxelType.LEAVES;
-
-              const topNeighbours = neighbours.top.getNeighbours(chunk, chunkNeighbours);
-              if (topNeighbours.left) topNeighbours.left.id = VoxelType.LEAVES;
-              if (topNeighbours.right) topNeighbours.right.id = VoxelType.LEAVES;
-              if (topNeighbours.front) topNeighbours.front.id = VoxelType.LEAVES;
-              if (topNeighbours.back) topNeighbours.back.id = VoxelType.LEAVES;
+            neighbours[k].id = VoxelType.LEAVES;
+            const { chunk: c, chunkX: cX, chunkY: cY } = neighbours[k].getChunk();
+            let nextNeighbours;
+            if (cX !== chunkX || cY !== chunkY) {
+              nextNeighbours = neighbours[k].getNeighbours(c, this.getChunkNeighbours(cX, cY));
+            } else {
+              nextNeighbours = neighbours[k].getNeighbours(chunk, chunkNeighbours);
             }
+
+            // if (nextNeighbours[k]) nextNeighbours[k].id = VoxelType.LEAVES;
+
+            // fill in gaps
+            if (k === "left" || k === "right") {
+              if (nextNeighbours.front) nextNeighbours.front.id = VoxelType.LEAVES;
+              if (nextNeighbours.back) nextNeighbours.back.id = VoxelType.LEAVES;
+            }
+          });
+
+          // top
+          if (neighbours.top && neighbours.top.id === VoxelType.AIR) {
+            neighbours.top.id = VoxelType.LEAVES;
+
+            const topNeighbours = neighbours.top.getNeighbours(chunk, chunkNeighbours);
+            if (topNeighbours.left) topNeighbours.left.id = VoxelType.LEAVES;
+            if (topNeighbours.right) topNeighbours.right.id = VoxelType.LEAVES;
+            if (topNeighbours.front) topNeighbours.front.id = VoxelType.LEAVES;
+            if (topNeighbours.back) topNeighbours.back.id = VoxelType.LEAVES;
           }
         }
-      });
+      }
     });
   }
 
@@ -328,7 +335,7 @@ export default class World extends Scene {
     }
   }
 
-  forEachVoxel(chunk: Chunk, voxCb: (voxel?: Voxel, x?: number, y?: number, z?: number) => void) {
+  forEachVoxel(chunk: Chunk, voxCb: (voxel?: Voxel, x?: number, y?: number, z?: number) => void | boolean) {
     for (let y = 0; y < chunk.length; y++) {
       for (let x = 0; x < this.chunkSize; x++) {
         for (let z = 0; z < this.chunkSize; z++) {
@@ -359,11 +366,10 @@ export default class World extends Scene {
         mesh.geometry.dispose();
         mesh.geometry = null;
 
-        console.log(mesh.material.id);
         mesh.material.dispose();
         // mesh.material = null;
 
-        console.log(`Remove mesh at (${x}, ${y}).`);
+        // console.log(`Remove mesh at (${x}, ${y}).`);
         this.renderedMeshes.splice(i, 1);
       } else {
         noRender[`${x} ${y}`] = true;
