@@ -16,7 +16,7 @@ export interface Neighbours<T> {
 }
 
 export interface Face {
-  uvRow: number;
+  uvCol: number;
   dir: number[];
   corners: { pos: number[]; uv: number[] }[];
 }
@@ -24,7 +24,7 @@ export interface Face {
 // face geometry
 export const faces: { [index: string]: Face } = {
   left: {
-    uvRow: 1,
+    uvCol: 1,
     dir: [0, 0, -1],
     corners: [
       { pos: [0, 1, 0], uv: [0, 1] },
@@ -34,7 +34,7 @@ export const faces: { [index: string]: Face } = {
     ],
   },
   right: {
-    uvRow: 1,
+    uvCol: 1,
     dir: [0, 0, 1],
     corners: [
       { pos: [1, 1, 1], uv: [0, 1] },
@@ -44,7 +44,7 @@ export const faces: { [index: string]: Face } = {
     ],
   },
   bottom: {
-    uvRow: 2,
+    uvCol: 2,
     dir: [0, -1, 0],
     corners: [
       { pos: [1, 0, 1], uv: [1, 0] },
@@ -54,7 +54,7 @@ export const faces: { [index: string]: Face } = {
     ],
   },
   top: {
-    uvRow: 0,
+    uvCol: 0,
     dir: [0, 1, 0],
     corners: [
       { pos: [0, 1, 1], uv: [1, 1] },
@@ -64,7 +64,7 @@ export const faces: { [index: string]: Face } = {
     ],
   },
   back: {
-    uvRow: 1,
+    uvCol: 1,
     dir: [-1, 0, 0],
     corners: [
       { pos: [1, 0, 0], uv: [0, 0] },
@@ -74,7 +74,7 @@ export const faces: { [index: string]: Face } = {
     ],
   },
   front: {
-    uvRow: 1,
+    uvCol: 1,
     dir: [1, 0, 0],
     corners: [
       { pos: [0, 0, 1], uv: [0, 0] },
@@ -89,8 +89,9 @@ export enum VoxelType {
   AIR,
   GRASS,
   DIRT,
-  STONE,
+  LOG,
   WOOD,
+  STONE,
 }
 
 export default class Voxel {

@@ -25,8 +25,8 @@ export default class Engine {
     Engine.element.style.height = "";
 
     // shadows
-    Engine.renderer.shadowMap.enabled = true;
-    Engine.renderer.shadowMap.type = PCFSoftShadowMap;
+    // Engine.renderer.shadowMap.enabled = true;
+    // Engine.renderer.shadowMap.type = PCFSoftShadowMap;
   }
 
   static start() {

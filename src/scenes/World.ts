@@ -9,12 +9,9 @@ import {
   Color,
   CubeTextureLoader,
   DirectionalLight,
-  DoubleSide,
   HemisphereLight,
   Mesh,
   MeshLambertMaterial,
-  MeshPhongMaterial,
-  MeshToonMaterial,
   NearestFilter,
   Texture,
   TextureLoader,
@@ -30,8 +27,8 @@ export default class World extends Scene {
   tileTextures: Texture;
   chunkMaterial: MeshLambertMaterial;
   tileSize = 16;
-  tileTextureWidth = 16;
-  tileTextureHeight = 48;
+  tileTextureWidth = 48;
+  tileTextureHeight = 80;
 
   worldSize = 4;
   voxelSize = 1;
@@ -42,6 +39,7 @@ export default class World extends Scene {
 
   chunkHeight = 150;
   seaLevel = 0;
+  cavernLevel = -10;
   bedrock = -50;
 
   constructor(id: string) {
@@ -50,8 +48,8 @@ export default class World extends Scene {
 
   init() {
     // create skybox
-    // const loader = new CubeTextureLoader();
-    // const texture = loader.load([
+    // const cubeLoader = new CubeTextureLoader();
+    // const texture = cubeLoader.load([
     //   "assets/skybox/day_px.png",
     //   "assets/skybox/day_nx.png",
     //   "assets/skybox/day_py.png",
@@ -62,7 +60,7 @@ export default class World extends Scene {
     // Engine.renderScene.background = texture;
     Engine.renderScene.background = new Color("lightblue");
 
-    const skylight = new HemisphereLight("lightblue", "blue", 1);
+    const skylight = new HemisphereLight("lightblue", "white", 0.5);
     Engine.renderScene.add(skylight);
 
     this.addLight(0, this.chunkHeight, this.worldSize);
@@ -71,10 +69,9 @@ export default class World extends Scene {
     this.player.init();
 
     const loader = new TextureLoader();
-    const texture = loader.load("assets/textures/grass.png");
-    texture.magFilter = NearestFilter;
-    texture.minFilter = NearestFilter;
-    this.tileTextures = texture;
+    this.tileTextures = loader.load("assets/textures/tilesheet.png");
+    this.tileTextures.magFilter = NearestFilter;
+    this.tileTextures.minFilter = NearestFilter;
 
     this.chunkMaterial = new MeshLambertMaterial({
       map: this.tileTextures,
@@ -87,7 +84,7 @@ export default class World extends Scene {
   }
 
   private addLight(x: number, y: number, z: number) {
-    const dirLight = new DirectionalLight(0xffffff, 0.3);
+    const dirLight = new DirectionalLight(0xffffff, 0.8);
 
     dirLight.position.set(x, y, z);
     dirLight.target.position.set(0, 0, 0);
@@ -135,8 +132,8 @@ export default class World extends Scene {
         geometry.setIndex(indices);
         const mesh = new Mesh(geometry, this.chunkMaterial);
         mesh.position.set(c[0][0][0].x, c[0][0][0].y, c[0][0][0].z);
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
+        // mesh.castShadow = true;
+        // mesh.receiveShadow = true;
 
         Engine.renderScene.add(mesh);
         this.collidables.push(mesh);
@@ -165,8 +162,23 @@ export default class World extends Scene {
         for (let z = chunkZ; z < chunkZ + this.chunkSize; z++) {
           const n = Math.floor(noise(x * noisePosFactor, z * noisePosFactor) * noiseScale);
 
-          let id = VoxelType.GRASS;
-          if (y > this.seaLevel + n) id = VoxelType.AIR;
+          // world cake layers
+          let id = VoxelType.DIRT;
+          if (y < this.cavernLevel + n + Math.floor(Math.random() * 7)) id = VoxelType.STONE;
+          else if (y === this.seaLevel + n) id = VoxelType.GRASS;
+          else if (y > this.seaLevel + n) id = VoxelType.AIR;
+
+          // trees
+          if (y === this.seaLevel + n + 1 && Math.random() < 0.01) {
+            id = VoxelType.LOG;
+          }
+          // else if (
+          //   id === VoxelType.AIR &&
+          //   y < this.seaLevel + n + 5 &&
+          //   chunk[y + Math.abs(this.bedrock) - 1][x][z].id === VoxelType.LOG
+          // ) {
+          //   id = VoxelType.LOG;
+          // }
 
           const voxel = new Voxel(id, x, y, z);
           col.push(voxel);
@@ -200,6 +212,7 @@ export default class World extends Scene {
             chunk,
             neighbours
           );
+
           positions.push(...position);
           normals.push(...normal);
           indices.push(...index);
@@ -250,8 +263,8 @@ export default class World extends Scene {
           normal.push(...faces[k].dir);
 
           uv.push(
-            ((voxel.id - 1 + corner.uv[0]) * this.tileSize) / this.tileTextureWidth,
-            1 - ((faces[k].uvRow + 1 - corner.uv[1]) * this.tileSize) / this.tileTextureHeight
+            ((faces[k].uvCol + corner.uv[0]) * this.tileSize) / this.tileTextureWidth,
+            1 - ((voxel.id - corner.uv[1]) * this.tileSize) / this.tileTextureHeight
           );
         }
 
