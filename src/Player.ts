@@ -125,6 +125,9 @@ export default class Player {
     Engine.mouseController.controls.moveRight(this.velocity.x * delta);
     Engine.mouseController.controls.moveForward(this.velocity.z * delta);
     this.object.position.copy(Engine.camera.position).sub(this.cameraPos);
+
+    this.collide(delta);
+    Engine.camera.position.copy(this.object.position).add(this.cameraPos);
   }
 
   collide(delta: number) {
@@ -167,16 +170,16 @@ export default class Player {
     }
 
     // moving x
-    let collide = false;
+    // let collide = false;
     if (globalVelocity.x < 0 && vox.left && vox.left.id !== 0) {
       this.velocity.x = 0;
       this.object.position.x = vox.left.x + voxelSize + this.width / 2;
     } else if (globalVelocity.x > 0 && vox.right && vox.right.id !== 0) {
       this.velocity.x = 0;
       this.object.position.x = vox.right.x - this.width / 2;
-      collide = true;
+      // collide = true;
     }
-    console.log(collide, this.velocity.x, globalVelocity.x);
+    // console.log(collide, this.velocity.x, globalVelocity.x);
 
     // moving z
     if (globalVelocity.z < 0 && vox.front && vox.front.id !== 0) {
