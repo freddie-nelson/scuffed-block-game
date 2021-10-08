@@ -157,8 +157,10 @@ export default class World extends Scene {
 
     for (let y = this.bedrock; y < this.bedrock + this.chunkHeight; y++) {
       const slice: Voxel[][] = [];
+      let relX = 0;
       for (let x = chunkX; x < chunkX + this.chunkSize; x++) {
         const col: Voxel[] = [];
+        let relZ = 0;
         for (let z = chunkZ; z < chunkZ + this.chunkSize; z++) {
           const n = Math.floor(noise(x * noisePosFactor, z * noisePosFactor) * noiseScale);
 
@@ -169,22 +171,26 @@ export default class World extends Scene {
           else if (y > this.seaLevel + n) id = VoxelType.AIR;
 
           // trees
+          // if (chunk[chunk.length - 1]) console.log(chunk[chunk.length - 1][relX].length, relZ);
           if (y === this.seaLevel + n + 1 && Math.random() < 0.01) {
             id = VoxelType.LOG;
+          } else if (
+            id === VoxelType.AIR &&
+            y > this.seaLevel + n + 1 &&
+            y < this.seaLevel + n + 6 &&
+            chunk[chunk.length - 1][relX][relZ].id === VoxelType.LOG
+          ) {
+            id = VoxelType.LOG;
           }
-          // else if (
-          //   id === VoxelType.AIR &&
-          //   y < this.seaLevel + n + 5 &&
-          //   chunk[y + Math.abs(this.bedrock) - 1][x][z].id === VoxelType.LOG
-          // ) {
-          //   id = VoxelType.LOG;
-          // }
+          // console.log(chunk[chunk.length - 1][relX][relZ]);
 
           const voxel = new Voxel(id, x, y, z);
           col.push(voxel);
+          relZ++;
         }
 
         slice.push(col);
+        relX++;
       }
 
       chunk.push(slice);
