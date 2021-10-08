@@ -295,4 +295,16 @@ export default class Player {
 
     return vox && vox.id !== 0;
   }
+
+  getChunk() {
+    const world = <World>Engine.currScene;
+    const chunkX = Math.floor(this.object.position.x / world.chunkSize + world.chunkOffset);
+    const chunkY = Math.floor(this.object.position.z / world.chunkSize + world.chunkOffset);
+
+    return {
+      chunk: world.chunks[chunkY][chunkX],
+      chunkX,
+      chunkY,
+    };
+  }
 }

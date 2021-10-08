@@ -13,7 +13,9 @@ export default class Engine {
   static element: HTMLCanvasElement;
   static currScene: Scene;
   static readonly renderScene = new TScene();
-  static readonly renderer: WebGLRenderer = new WebGLRenderer({ antialias: true });
+  static readonly renderer: WebGLRenderer = new WebGLRenderer({
+    antialias: true,
+  });
   static camera: PerspectiveCamera;
   static readonly clock = new Clock(false);
   private static delta = 30;
