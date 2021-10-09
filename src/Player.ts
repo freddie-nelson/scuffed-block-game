@@ -1,6 +1,6 @@
 import { BoxBufferGeometry, Mesh, MeshBasicMaterial, Vector3 } from "three";
 import Engine from "./Engine";
-import World from "./scenes/World/World";
+import World from "./World";
 import Voxel, { Neighbours } from "./Voxel";
 
 export default class Player {

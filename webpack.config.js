@@ -1,7 +1,37 @@
+const webpack = require("webpack");
+
 module.exports = {
-  entry: "./src/main.ts",
-  target: "node",
   mode: "development",
+  entry: {
+    main: "./src/main.ts",
+    worker: "./src/ChunkGeneratorWorker.ts",
+  },
+  output: {
+    filename: "./dist/js/[name].js",
+    path: __dirname,
+  },
+  resolve: {
+    extensions: [".tsx", ".ts", ".js"],
+    modules: ["node_modules"],
+  },
+  plugins: [
+    // new webpack.optimize.CommonsChunkPlugin({
+    //   name: "commons",
+    //   filename: "./dist/js/common.js",
+    // }),
+    new webpack.BannerPlugin({
+      banner: `var window = self; importScripts("./common.js");`,
+      raw: true,
+      entryOnly: true,
+      test: "./dist/js/worker.js",
+    }),
+  ],
+  optimization: {
+    splitChunks: {
+      chunks: "all",
+      name: () => "common",
+    },
+  },
   module: {
     rules: [
       {
@@ -10,12 +40,5 @@ module.exports = {
         exclude: /node_modules/,
       },
     ],
-  },
-  resolve: {
-    extensions: [".tsx", ".ts", ".js"],
-  },
-  output: {
-    filename: "./dist/js/build.js",
-    path: __dirname,
   },
 };

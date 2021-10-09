@@ -1,5 +1,4 @@
-import Engine from "./Engine";
-import World, { Chunk } from "./scenes/World/World";
+import World, { Chunk } from "./World";
 
 export interface Neighbours<T> {
   [index: string]: T;
@@ -108,11 +107,11 @@ export default class Voxel {
     this.z = z;
   }
 
-  getNeighbours(chunk: Chunk, cNeighbours: Neighbours<Chunk>) {
+  getNeighbours(chunk: Chunk, cNeighbours: Neighbours<Chunk>, bedrock: number) {
     const cHeight = chunk.length;
     const chunkSize = chunk[0].length;
 
-    const y = this.y + Math.abs((Engine.currScene as World).generatorOptions.bedrock);
+    const y = this.y + Math.abs(bedrock);
     const x = this.x + Math.abs(chunk[0][0][0].x) * Math.sign(this.x * -1);
     const z = this.z + Math.abs(chunk[0][0][0].z) * Math.sign(this.z * -1);
 
@@ -132,13 +131,11 @@ export default class Voxel {
     return neighbours;
   }
 
-  getChunk() {
-    const world = <World>Engine.currScene;
-    const chunkX = Math.floor(this.x / world.chunkSize + world.chunkOffset);
-    const chunkY = Math.floor(this.z / world.chunkSize + world.chunkOffset);
+  getChunk(chunkSize: number, chunkOffset: number) {
+    const chunkX = Math.floor(this.x / chunkSize + chunkOffset);
+    const chunkY = Math.floor(this.z / chunkSize + chunkOffset);
 
     return {
-      chunk: world.chunks[chunkY][chunkX],
       chunkX,
       chunkY,
     };

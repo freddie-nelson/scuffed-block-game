@@ -14,10 +14,10 @@ import {
   TextureLoader,
 } from "three";
 
-import Engine from "../../Engine";
-import Player from "../../Player";
-import Scene from "../Scene";
-import Voxel, { faces, Neighbours, VoxelType } from "../../Voxel";
+import Engine from "./Engine";
+import Player from "./Player";
+import Scene from "./Scene";
+import Voxel, { faces, Neighbours, VoxelType } from "./Voxel";
 import ChunkGenerator, { ChunkGeneratorOptions } from "./ChunkGenerator";
 
 export type Chunk = Voxel[][][];
@@ -35,7 +35,7 @@ export default class World extends Scene {
   tileTextureHeight = 96;
 
   worldSize = 512;
-  renderDist = 8;
+  renderDist = 12;
   voxelSize = 1;
   chunkSize = 8;
 
@@ -46,7 +46,7 @@ export default class World extends Scene {
   chunkOffset = Math.floor(this.worldSize / 2);
   renderedMeshes: Mesh<BufferGeometry, MeshLambertMaterial>[] = [];
 
-  generator: ChunkGenerator;
+  generator: Worker;
   generatorOptions: ChunkGeneratorOptions = {
     chunkOffset: this.chunkOffset,
     chunkSize: this.chunkSize,
@@ -59,6 +59,9 @@ export default class World extends Scene {
     noiseScale: 8,
     noise2Scale: 4,
   };
+  chunksQueued = 0;
+  canRequestGeneration = true;
+  generationLimits: { lowerX: number; iterationsX: number; lowerY: number; iterationsY: number };
 
   noiseCache: { [index: string]: { n: number; n2: number; tOff: number } } = {};
 
@@ -66,7 +69,30 @@ export default class World extends Scene {
     super(id);
 
     this.seed = 3;
-    this.generator = new ChunkGenerator(this.seed, this.generatorOptions);
+
+    // setup worker
+    this.generator = new Worker("../dist/js/worker.js");
+    this.generator.postMessage({
+      msg: "createGenerator",
+      data: { seed: this.seed, options: this.generatorOptions },
+    });
+    this.generator.onmessage = (ev: MessageEvent) => {
+      const { msg, data } = ev.data;
+
+      switch (msg) {
+        case "chunk":
+          const { x, y, c } = data;
+          this.chunks[y][x] = c;
+          this.chunksQueued--;
+
+          if (this.chunksQueued === 0) {
+            // generate chunk meshes
+            this.canRequestGeneration = true;
+            this.generateMesh(this.generationLimits);
+          }
+          break;
+      }
+    };
   }
 
   init() {
@@ -105,7 +131,7 @@ export default class World extends Scene {
   }
 
   update(delta: number) {
-    this.player.update();
+    if (this.player.getChunk().chunk && Engine.getDelta() < 0.1) this.player.update();
 
     const { chunkX, chunkY } = this.player.getChunk();
     if (chunkX !== this.lastGeneratedCenter.x || chunkY !== this.lastGeneratedCenter.y) {
@@ -137,26 +163,17 @@ export default class World extends Scene {
       iterationsX: this.renderDist,
     };
 
+    this.generationLimits = limits;
+    this.canRequestGeneration = false;
+
     // generate chunk data
-    let timer = performance.now();
-    let chunksGenerated = 0;
-    console.log("Generating chunks...");
     this.forEachChunk(limits, (chunk, x, y) => {
       if (this.generated[y][x]) return;
 
-      const c = this.generator.generateChunk(x, y);
-      this.chunks[y][x] = c;
+      this.generator.postMessage({ msg: "requestGeneration", data: { x, y } });
+      this.chunksQueued++;
       this.generated[y][x] = true;
-
-      chunksGenerated++;
     });
-    console.log(`Generated ${chunksGenerated} chunks in ${performance.now() - timer}ms.`);
-
-    // generate chunk meshes
-    timer = performance.now();
-    console.log("Creating mesh...");
-    this.generateMesh(limits);
-    console.log(`Finished creating mesh in ${performance.now() - timer}ms.`);
   }
 
   getChunkNeighbours(x: number, y: number) {
@@ -291,7 +308,7 @@ export default class World extends Scene {
     chunk: Chunk,
     cNeighbours: Neighbours<Chunk>
   ) {
-    const voxel = chunk[y][x][z];
+    let voxel = chunk[y][x][z];
     if (voxel.id === VoxelType.AIR)
       return {
         position: [],
@@ -300,7 +317,10 @@ export default class World extends Scene {
         uv: [],
       }; // empty
 
-    const neighbours = voxel.getNeighbours(chunk, cNeighbours);
+    if (!(voxel instanceof Voxel))
+      voxel = new Voxel((voxel as Voxel).id, (voxel as Voxel).x, (voxel as Voxel).y, (voxel as Voxel).z);
+
+    const neighbours = voxel.getNeighbours(chunk, cNeighbours, this.generatorOptions.bedrock);
 
     const position: number[] = [];
     const normal: number[] = [];
@@ -337,7 +357,14 @@ export default class World extends Scene {
   getVoxel(x: number, y: number, z: number, chunkPos?: { x?: number; y?: number }) {
     const chunkX = Math.floor(x / this.chunkSize) + this.chunkOffset; // 1
     const chunkY = Math.floor(z / this.chunkSize) + this.chunkOffset; // 1
-    if (chunkX < 0 || chunkX >= this.worldSize || chunkY < 0 || chunkY >= this.worldSize) return;
+    if (
+      chunkX < 0 ||
+      chunkX >= this.worldSize ||
+      chunkY < 0 ||
+      chunkY >= this.worldSize ||
+      !this.chunks[chunkY][chunkX]
+    )
+      return;
     const chunk = this.chunks[chunkY][chunkX];
 
     const relY = y + Math.abs(this.generatorOptions.bedrock); // 40

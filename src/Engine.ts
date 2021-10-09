@@ -6,8 +6,8 @@ const seedrandom: sr = require("seedrandom");
 import KeyboardController from "./KeyboardController";
 import MouseController from "./MouseController";
 
-import Scene from "./scenes/Scene";
-import World from "./scenes/World/World";
+import Scene from "./Scene";
+import World from "./World";
 
 export default class Engine {
   static element: HTMLCanvasElement;

@@ -3,7 +3,7 @@ import sr from "seedrandom";
 const seedrandom: sr = require("seedrandom");
 
 import { Chunk } from "./World";
-import Voxel, { VoxelType } from "../../Voxel";
+import Voxel, { VoxelType } from "./Voxel";
 
 export interface ChunkGeneratorOptions {
   chunkSize: number;
@@ -71,7 +71,7 @@ export default class ChunkGenerator {
     this.fillNoiseCache(chunkX, chunkZ);
 
     const c = this.generateLayers(chunkX, chunkZ);
-    this.generateTrees(c, x, y);
+    this.generateTrees(c);
 
     return c;
   }
@@ -94,6 +94,11 @@ export default class ChunkGenerator {
           // bleed cavern layer into dirt
           if (y < this.cavernLevel + Math.floor(this.random() * this.cavernBleed) && id !== VoxelType.AIR)
             id = VoxelType.STONE;
+          else if (
+            y < this.cavernLevel + Math.floor(this.random() * this.cavernBleed) &&
+            id === VoxelType.GRASS
+          )
+            id = VoxelType.DIRT;
 
           const voxel = new Voxel(id, x, y, z);
           col.push(voxel);
@@ -108,7 +113,7 @@ export default class ChunkGenerator {
     return chunk;
   }
 
-  generateTrees(chunk: Chunk, chunkX: number, chunkY: number) {
+  generateTrees(chunk: Chunk) {
     const treeHeight = 5;
     const treeHeightDiff = -1;
     const treeScaleChance = 0.2;
@@ -158,7 +163,7 @@ export default class ChunkGenerator {
 
         // place leaves around top of tree
         if (logsBelow >= 2) {
-          const neighbours = vox.getNeighbours(chunk, {});
+          const neighbours = vox.getNeighbours(chunk, {}, this.bedrock);
 
           // side leaves
           Object.keys(neighbours).forEach((k) => {
@@ -167,7 +172,7 @@ export default class ChunkGenerator {
             neighbours[k].id = VoxelType.LEAVES;
 
             // fill in gaps
-            const nextNeighbours = neighbours[k].getNeighbours(chunk, {});
+            const nextNeighbours = neighbours[k].getNeighbours(chunk, {}, this.bedrock);
             if (k === "left" || k === "right") {
               if (nextNeighbours.front) nextNeighbours.front.id = VoxelType.LEAVES;
               if (nextNeighbours.back) nextNeighbours.back.id = VoxelType.LEAVES;
@@ -178,7 +183,7 @@ export default class ChunkGenerator {
           if (neighbours.top && neighbours.top.id === VoxelType.AIR) {
             neighbours.top.id = VoxelType.LEAVES;
 
-            const topNeighbours = neighbours.top.getNeighbours(chunk, {});
+            const topNeighbours = neighbours.top.getNeighbours(chunk, {}, this.bedrock);
             if (topNeighbours.left) topNeighbours.left.id = VoxelType.LEAVES;
             if (topNeighbours.right) topNeighbours.right.id = VoxelType.LEAVES;
             if (topNeighbours.front) topNeighbours.front.id = VoxelType.LEAVES;
