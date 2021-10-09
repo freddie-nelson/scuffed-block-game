@@ -18,9 +18,9 @@ export default class Engine {
   });
   static camera: PerspectiveCamera;
   static readonly clock = new Clock(false);
-  private static delta = 30;
-  static readonly mouseController = new MouseController();
-  static readonly keyController = new KeyboardController();
+  private static delta = 0;
+  static mouseController: MouseController;
+  static keyController: KeyboardController;
   static random: ReturnType<sr.Callback>;
 
   constructor(element: HTMLCanvasElement) {
@@ -32,6 +32,10 @@ export default class Engine {
 
     // init random number generator
     Engine.random = seedrandom();
+
+    // init controllers
+    Engine.mouseController = new MouseController();
+    Engine.keyController = new KeyboardController();
 
     // shadows
     // Engine.renderer.shadowMap.enabled = true;

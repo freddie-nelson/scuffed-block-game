@@ -9,10 +9,23 @@ interface Listener {
 
 export default class MouseController {
   controls: PointerLockControls;
+  mouse = {
+    isPressed: false,
+    button: 0,
+  };
   private using = "pointerlock";
   private listeners: Listener[] = [];
 
-  constructor() {}
+  constructor() {
+    this.registerListener("mousedown", (e: MouseEvent) => {
+      this.mouse.isPressed = true;
+      this.mouse.button = e.button;
+    });
+    this.registerListener("mouseup", (e: MouseEvent) => {
+      this.mouse.isPressed = false;
+      this.mouse.button = e.button;
+    });
+  }
 
   refresh() {
     switch (this.using) {

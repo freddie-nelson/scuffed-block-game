@@ -1,7 +1,7 @@
-import { BoxBufferGeometry, Mesh, MeshBasicMaterial, Vector3 } from "three";
+import { BoxBufferGeometry, Mesh, MeshBasicMaterial, Raycaster, Vector3 } from "three";
 import Engine from "./Engine";
 import World from "./World";
-import Voxel, { Neighbours } from "./Voxel";
+import Voxel, { Neighbours, VoxelType } from "./Voxel";
 
 export default class Player {
   height = 2;
@@ -19,6 +19,12 @@ export default class Player {
   object: Mesh;
   noClip = false;
 
+  lastPlaceTime = 0;
+  placeLimit = 200;
+  lastDestroyTime = 0;
+  destroyLimit = 200;
+  blockRange = 5;
+
   constructor(x: number, y: number, z: number) {
     const geometry = new BoxBufferGeometry(this.width, this.height, this.width);
     const material = new MeshBasicMaterial({ color: 0x0000ff });
@@ -35,6 +41,7 @@ export default class Player {
 
   update() {
     const keyController = Engine.keyController;
+    const mouseController = Engine.mouseController;
     const delta = Engine.getDelta();
 
     // copy camera rotation to player
@@ -49,12 +56,32 @@ export default class Player {
     let acceleration = this.acceleration * (isOnGround ? 1 : 0.1);
     let maxVelocity = this.maxVelocity.clone();
 
+    // place / destroy blocks
+    if (mouseController.mouse.isPressed) {
+      const time = performance.now();
+      switch (mouseController.mouse.button) {
+        case 0:
+          if (time - this.lastDestroyTime > this.destroyLimit) {
+            this.lastDestroyTime = time;
+            this.setSelectedVoxel();
+          }
+          break;
+        case 2:
+          if (time - this.lastPlaceTime > this.placeLimit) {
+            this.lastPlaceTime = time;
+            this.setSelectedVoxel(true, VoxelType.DIRT);
+          }
+          break;
+      }
+    }
+
     // sprint
     if (keyController.isKeyPressed("ShiftLeft")) {
       acceleration *= 1.2;
       maxVelocity.multiplyScalar(1.5);
     }
 
+    // movement
     if (keyController.isKeyPressed("KeyW")) {
       moveF = true;
       this.velocity.z += acceleration * delta;
@@ -135,6 +162,71 @@ export default class Player {
 
     this.collide(delta);
     Engine.camera.position.copy(this.object.position).add(this.cameraPos);
+  }
+
+  setSelectedVoxel(outside = false, id = VoxelType.AIR) {
+    const vox = this.findSelectedVoxel(outside);
+    if (!vox) return;
+    else if (!vox.getChunk) Object.setPrototypeOf(vox, Voxel.prototype);
+
+    vox.id = id;
+
+    const world = <World>Engine.currScene;
+    const { chunkX, chunkY } = vox.getChunk(world.chunkSize, world.chunkOffset);
+    const chunk = world.chunks[chunkY][chunkX];
+
+    const key = `${chunkX} ${chunkY}`;
+    if (world.replaceChunks[key]) world.replaceChunks[key]++;
+    else world.replaceChunks[key] = 1;
+    world.requestChunkGeometry(chunk, chunkX, chunkY);
+
+    const cn = world.getChunkNeighbours(chunkX, chunkY);
+    const n = vox.getNeighbours(world.chunks[chunkY][chunkX], cn, world.chunkGeneratorOptions.bedrock);
+
+    Object.keys(n).forEach((k) => {
+      if (!n[k]) return;
+      const { chunkX: ncx, chunkY: ncy } = vox.getChunk(world.chunkSize, world.chunkOffset);
+      if (ncx !== chunkX || ncy !== chunkY) {
+        const chunk = world.chunks[ncy][ncx];
+        const key = `${ncx} ${ncy}`;
+        if (world.replaceChunks[key]) world.replaceChunks[key]++;
+        else world.replaceChunks[key] = 1;
+        world.requestChunkGeometry(chunk, ncx, ncy);
+      }
+    });
+  }
+
+  private findSelectedVoxel(outside: boolean = false) {
+    const world = <World>Engine.currScene;
+
+    const ray = new Raycaster(
+      Engine.camera.position,
+      Engine.camera.getWorldDirection(new Vector3()),
+      0,
+      this.blockRange
+    );
+    const point = ray.intersectObjects(world.renderedMeshes)[0]?.point;
+    if (point) {
+      point
+        .add(Engine.camera.getWorldDirection(new Vector3()).divideScalar(1000 * (outside ? -1 : 1)))
+        .floor();
+
+      const vox = world.getVoxel(point.x, point.y, point.z);
+
+      // check if voxel collides with player
+      if (
+        vox.x === Math.floor(this.object.position.x) &&
+        vox.y >= Math.floor(this.object.position.y) - this.height / 2 &&
+        vox.y < Math.floor(this.object.position.y) + this.height / 2 &&
+        vox.z === Math.floor(this.object.position.z)
+      ) {
+        return undefined;
+      }
+
+      return vox;
+    }
+
+    return undefined;
   }
 
   collide(delta: number) {

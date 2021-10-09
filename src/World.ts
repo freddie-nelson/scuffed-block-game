@@ -62,6 +62,7 @@ export default class World extends Scene {
   };
   chunksQueued = 0;
   canRequestGeneration = true;
+  replaceChunks: { [index: string]: number } = {};
   generationLimits: { lowerX: number; iterationsX: number; lowerY: number; iterationsY: number };
 
   geometryGenerator: Worker;
@@ -71,7 +72,7 @@ export default class World extends Scene {
   constructor(id: string) {
     super(id);
 
-    this.seed = 3;
+    this.seed = 11;
 
     // setup workers
     this.setupChunkGenerator();
@@ -110,6 +111,8 @@ export default class World extends Scene {
     this.initChunks();
     const { chunkX, chunkY } = this.player.getChunk();
     this.lastGeneratedCenter = { x: chunkX, y: chunkY };
+
+    // generate initial chunks around player
     this.requestGeneration(chunkX, chunkY);
   }
 
@@ -147,7 +150,7 @@ export default class World extends Scene {
     };
 
     this.generationLimits = limits;
-    this.canRequestGeneration = false;
+    // this.canRequestGeneration = false;
 
     // generate chunk data
     this.forEachChunk(limits, (chunk, x, y) => {
@@ -203,16 +206,7 @@ export default class World extends Scene {
         y < limits.lowerY ||
         y >= limits.lowerY + limits.iterationsY
       ) {
-        Engine.renderScene.remove(mesh);
-
-        mesh.geometry.dispose();
-        mesh.geometry = null;
-
-        mesh.material.dispose();
-        // mesh.material = null;
-
-        // console.log(`Remove mesh at (${x}, ${y}).`);
-        this.renderedMeshes.splice(i, 1);
+        this.removeChunkMesh(mesh, i);
       } else {
         noRender[`${x} ${y}`] = true;
       }
@@ -223,24 +217,72 @@ export default class World extends Scene {
     this.forEachChunk(limits, (chunk, x, y) => {
       if (noRender[`${x} ${y}`]) return;
 
-      const parsed = this.parseChunk(chunk);
-      // parsedCount++;
-
-      this.geometryGenerator.postMessage({ msg: "requestGeometry", data: { chunk: parsed, x, y } }, [
-        parsed.buffer,
-      ]);
+      this.requestChunkGeometry(chunk, x, y);
     });
+
     // console.log(parsedCount);
     // console.log(performance.now() - timer);
   }
 
-  parseChunk(chunk: Chunk) {
+  requestChunkGeometry(chunk: Chunk, x: number, y: number) {
+    const parsed = this.serialiseChunk(chunk);
+    // parsedCount++;
+
+    this.geometryGenerator.postMessage({ msg: "requestGeometry", data: { chunk: parsed, x, y } }, [
+      parsed.buffer,
+    ]);
+  }
+
+  removeChunkMesh(mesh: Mesh, renderedMeshesIndex?: number) {
+    Engine.renderScene.remove(mesh);
+
+    mesh.geometry.dispose();
+    mesh.geometry = null;
+
+    (mesh.material as Material).dispose();
+    // mesh.material = null;
+
+    // console.log(`Remove mesh at (${x}, ${y}).`);
+    if (renderedMeshesIndex !== undefined) {
+      this.renderedMeshes.splice(renderedMeshesIndex, 1);
+    } else {
+      this.renderedMeshes.splice(
+        this.renderedMeshes.findIndex((m) => m.id === mesh.id),
+        1
+      );
+    }
+  }
+
+  serialiseChunk(chunk: Chunk) {
     const c = new Uint8Array(this.chunkGeneratorOptions.chunkHeight * this.chunkSize * this.chunkSize);
 
     for (let y = 0; y < this.chunkGeneratorOptions.chunkHeight; y++) {
       for (let x = 0; x < this.chunkSize; x++) {
         for (let z = 0; z < this.chunkSize; z++) {
           c[x + this.chunkSize * (y + this.chunkGeneratorOptions.chunkHeight * z)] = chunk[y][x][z].id;
+        }
+      }
+    }
+
+    return c;
+  }
+
+  deserialiseChunk(chunk: Uint8Array, startX: number, startZ: number) {
+    const c: Chunk = [];
+
+    for (let y = 0; y < this.chunkGeneratorOptions.chunkHeight; y++) {
+      c.push([]);
+      for (let x = 0; x < this.chunkSize; x++) {
+        c[y].push([]);
+        for (let z = 0; z < this.chunkSize; z++) {
+          c[y][x].push(
+            new Voxel(
+              chunk[x + this.chunkSize * (y + this.chunkGeneratorOptions.chunkHeight * z)],
+              startX + x,
+              y,
+              startZ + z
+            )
+          );
         }
       }
     }
@@ -355,6 +397,19 @@ export default class World extends Scene {
         case "geometry":
           const { x, y, positions, normals, uvs, indices } = data;
           this.generateChunkMesh(this.chunks[y][x], positions, normals, uvs, indices);
+          if (this.replaceChunks[`${x} ${y}`] > 0) {
+            const i = this.renderedMeshes.findIndex(
+              (m) =>
+                m.position.x / this.chunkSize + this.chunkOffset === x &&
+                m.position.z / this.chunkSize + this.chunkOffset === y
+            );
+            if (i !== -1) {
+              this.removeChunkMesh(this.renderedMeshes[i], i);
+            }
+
+            this.replaceChunks[`${x} ${y}`]--;
+            if (this.replaceChunks[`${x} ${y}`] === 0) delete this.replaceChunks[`${x} ${y}`];
+          }
           // this.chunks[y][x] = c;
           // this.chunksQueued--;
 

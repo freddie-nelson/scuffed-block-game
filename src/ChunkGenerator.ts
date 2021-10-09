@@ -169,25 +169,31 @@ export default class ChunkGenerator {
           Object.keys(neighbours).forEach((k) => {
             if (!neighbours[k] || k === "top" || k === "bottom") return;
 
-            neighbours[k].id = VoxelType.LEAVES;
+            if (neighbours[k].id === VoxelType.AIR) neighbours[k].id = VoxelType.LEAVES;
 
             // fill in gaps
             const nextNeighbours = neighbours[k].getNeighbours(chunk, {}, this.bedrock);
             if (k === "left" || k === "right") {
-              if (nextNeighbours.front) nextNeighbours.front.id = VoxelType.LEAVES;
-              if (nextNeighbours.back) nextNeighbours.back.id = VoxelType.LEAVES;
+              if (nextNeighbours.front && nextNeighbours.front.id === VoxelType.AIR)
+                nextNeighbours.front.id = VoxelType.LEAVES;
+              if (nextNeighbours.back && nextNeighbours.back.id === VoxelType.AIR)
+                nextNeighbours.back.id = VoxelType.LEAVES;
             }
           });
 
           // top
-          if (neighbours.top && neighbours.top.id === VoxelType.AIR) {
-            neighbours.top.id = VoxelType.LEAVES;
+          if (neighbours.top) {
+            if (neighbours.top.id === VoxelType.AIR) neighbours.top.id = VoxelType.LEAVES;
 
             const topNeighbours = neighbours.top.getNeighbours(chunk, {}, this.bedrock);
-            if (topNeighbours.left) topNeighbours.left.id = VoxelType.LEAVES;
-            if (topNeighbours.right) topNeighbours.right.id = VoxelType.LEAVES;
-            if (topNeighbours.front) topNeighbours.front.id = VoxelType.LEAVES;
-            if (topNeighbours.back) topNeighbours.back.id = VoxelType.LEAVES;
+            if (topNeighbours.left && topNeighbours.left.id === VoxelType.AIR)
+              topNeighbours.left.id = VoxelType.LEAVES;
+            if (topNeighbours.right && topNeighbours.right.id === VoxelType.AIR)
+              topNeighbours.right.id = VoxelType.LEAVES;
+            if (topNeighbours.front && topNeighbours.front.id === VoxelType.AIR)
+              topNeighbours.front.id = VoxelType.LEAVES;
+            if (topNeighbours.back && topNeighbours.back.id === VoxelType.AIR)
+              topNeighbours.back.id = VoxelType.LEAVES;
           }
         }
       }
