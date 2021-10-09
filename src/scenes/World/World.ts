@@ -14,21 +14,16 @@ import {
   TextureLoader,
 } from "three";
 
-import { makeNoise2D } from "fast-simplex-noise";
-
-import sr from "seedrandom";
-const seedrandom: sr = require("seedrandom");
-
-import Engine from "../Engine";
-import Player from "../Player";
-import Scene from "./Scene";
-import Voxel, { faces, Neighbours, VoxelType } from "../Voxel";
+import Engine from "../../Engine";
+import Player from "../../Player";
+import Scene from "../Scene";
+import Voxel, { faces, Neighbours, VoxelType } from "../../Voxel";
+import ChunkGenerator, { ChunkGeneratorOptions } from "./ChunkGenerator";
 
 export type Chunk = Voxel[][][];
 
 export default class World extends Scene {
   seed: number;
-  random: ReturnType<sr.Callback>;
 
   player: Player;
 
@@ -51,17 +46,19 @@ export default class World extends Scene {
   chunkOffset = Math.floor(this.worldSize / 2);
   renderedMeshes: Mesh<BufferGeometry, MeshLambertMaterial>[] = [];
 
-  chunkHeight = 80;
-  seaLevel = 0;
-  cavernLevel = -12;
-  cavernBleed = 7;
-  bedrock = -30;
-
-  noise: ReturnType<typeof makeNoise2D>;
-  noise2: ReturnType<typeof makeNoise2D>;
-  noisePosFactor = 0.01;
-  noiseScale = 8;
-  noise2Scale = 4;
+  generator: ChunkGenerator;
+  generatorOptions: ChunkGeneratorOptions = {
+    chunkOffset: this.chunkOffset,
+    chunkSize: this.chunkSize,
+    chunkHeight: 80,
+    seaLevel: 0,
+    cavernLevel: -12,
+    cavernBleed: 7,
+    bedrock: -30,
+    noisePosFactor: 0.01,
+    noiseScale: 8,
+    noise2Scale: 4,
+  };
 
   noiseCache: { [index: string]: { n: number; n2: number; tOff: number } } = {};
 
@@ -69,10 +66,7 @@ export default class World extends Scene {
     super(id);
 
     this.seed = 3;
-
-    this.random = seedrandom(String(this.seed));
-    this.noise = makeNoise2D(this.random);
-    this.noise2 = makeNoise2D(this.random);
+    this.generator = new ChunkGenerator(this.seed, this.generatorOptions);
   }
 
   init() {
@@ -82,7 +76,7 @@ export default class World extends Scene {
     Engine.renderScene.add(skylight);
 
     // sun
-    this.addLight(0, this.seaLevel + 200, this.worldSize);
+    this.addLight(0, this.generatorOptions.seaLevel + 200, this.worldSize);
 
     // fog
     Engine.renderScene.fog = new Fog(
@@ -107,7 +101,7 @@ export default class World extends Scene {
     this.initChunks();
     const { chunkX, chunkY } = this.player.getChunk();
     this.lastGeneratedCenter = { x: chunkX, y: chunkY };
-    this.generate(chunkX, chunkY);
+    this.requestGeneration(chunkX, chunkY);
   }
 
   update(delta: number) {
@@ -115,7 +109,7 @@ export default class World extends Scene {
 
     const { chunkX, chunkY } = this.player.getChunk();
     if (chunkX !== this.lastGeneratedCenter.x || chunkY !== this.lastGeneratedCenter.y) {
-      this.generate(chunkX, chunkY);
+      this.requestGeneration(chunkX, chunkY);
       this.lastGeneratedCenter = { x: chunkX, y: chunkY };
     }
   }
@@ -135,7 +129,7 @@ export default class World extends Scene {
     }
   }
 
-  generate(centerX: number, centerY: number) {
+  requestGeneration(centerX: number, centerY: number) {
     const limits = {
       lowerX: centerX - this.chunkRenderOffset,
       iterationsY: this.renderDist,
@@ -150,17 +144,10 @@ export default class World extends Scene {
     this.forEachChunk(limits, (chunk, x, y) => {
       if (this.generated[y][x]) return;
 
-      const chunkX = (x - this.chunkOffset) * this.chunkSize;
-      const chunkZ = (y - this.chunkOffset) * this.chunkSize;
-
-      this.fillNoiseCache(chunkX, chunkZ);
-
-      const c = this.generateChunk(chunkX, chunkZ);
-
-      this.generateTrees(c, x, y);
-
+      const c = this.generator.generateChunk(x, y);
       this.chunks[y][x] = c;
       this.generated[y][x] = true;
+
       chunksGenerated++;
     });
     console.log(`Generated ${chunksGenerated} chunks in ${performance.now() - timer}ms.`);
@@ -172,155 +159,12 @@ export default class World extends Scene {
     console.log(`Finished creating mesh in ${performance.now() - timer}ms.`);
   }
 
-  fillNoiseCache(startX: number, startZ: number) {
-    this.noiseCache = {};
-
-    for (let x = startX; x < startX + this.chunkSize; x++) {
-      for (let z = startZ; z < startZ + this.chunkSize; z++) {
-        this.noiseCache[`${x} ${z}`] = this.getTerrainNoise(x, z);
-      }
-    }
-  }
-
   getChunkNeighbours(x: number, y: number) {
     return <Neighbours<Chunk>>{
       left: x - 1 >= 0 ? this.chunks[y][x - 1] : undefined,
       right: x + 1 < this.worldSize ? this.chunks[y][x + 1] : undefined,
       back: y - 1 >= 0 ? this.chunks[y - 1][x] : undefined,
       front: y + 1 < this.worldSize ? this.chunks[y + 1][x] : undefined,
-    };
-  }
-
-  generateChunk(chunkX: number, chunkZ: number) {
-    const chunk: Chunk = [];
-
-    for (let y = this.bedrock; y < this.bedrock + this.chunkHeight; y++) {
-      const slice: Voxel[][] = [];
-      for (let x = chunkX; x < chunkX + this.chunkSize; x++) {
-        const col: Voxel[] = [];
-        for (let z = chunkZ; z < chunkZ + this.chunkSize; z++) {
-          const { tOff } = this.noiseCache[`${x} ${z}`];
-
-          // world cake layers
-          let id = VoxelType.DIRT;
-          if (y === this.seaLevel + tOff) id = VoxelType.GRASS;
-          else if (y > this.seaLevel + tOff) id = VoxelType.AIR;
-
-          // bleed cavern layer into dirt
-          if (y < this.cavernLevel + Math.floor(this.random() * this.cavernBleed) && id !== VoxelType.AIR)
-            id = VoxelType.STONE;
-
-          const voxel = new Voxel(id, x, y, z);
-          col.push(voxel);
-        }
-
-        slice.push(col);
-      }
-
-      chunk.push(slice);
-    }
-
-    return chunk;
-  }
-
-  generateTrees(chunk: Chunk, chunkX: number, chunkY: number) {
-    const treeHeight = 5;
-    const treeHeightDiff = -1;
-    const treeScaleChance = 0.2;
-    const treeUpperRange = -this.noiseScale / 6;
-    const treeLowerRange = -this.noiseScale / 1.3;
-
-    // trunks pass
-    this.forEachVoxel(chunk, (vox, relX, relY, relZ) => {
-      // TODO properly fix mesh generation for trees on chunk borders
-      const { tOff } = this.noiseCache[`${vox.x} ${vox.z}`];
-      if (
-        vox.y < this.seaLevel + tOff + 1 ||
-        vox.y > this.seaLevel + tOff + treeHeight + (this.random() < treeScaleChance ? treeHeightDiff : 0) ||
-        relX === 0 ||
-        relX === this.chunkSize - 1 ||
-        relZ === 0 ||
-        relZ === this.chunkSize - 1
-      )
-        return;
-
-      if (
-        tOff > treeLowerRange &&
-        tOff < treeUpperRange &&
-        vox.y === this.seaLevel + tOff + 1 &&
-        chunk[relY - 1][relX][relZ].id === VoxelType.GRASS &&
-        this.random() < 0.018
-      ) {
-        vox.id = VoxelType.LOG;
-      } else if (vox.id === VoxelType.AIR && chunk[relY - 1][relX][relZ].id === VoxelType.LOG) {
-        vox.id = VoxelType.LOG;
-      }
-    });
-
-    // leaves pass
-    this.forEachVoxel(chunk, (vox, relX, relY, relZ) => {
-      const { tOff } = this.noiseCache[`${vox.x} ${vox.z}`];
-      if (vox.y < this.cavernLevel || vox.y > this.seaLevel + tOff + treeHeight) return;
-
-      if (vox.id === VoxelType.LOG) {
-        let logsBelow = 0;
-        let y = relY - 1;
-        while (chunk[y][relX][relZ].id === VoxelType.LOG) {
-          logsBelow++;
-          y--;
-        }
-
-        // place leaves around top of tree
-        if (logsBelow >= 2) {
-          const chunkNeighbours = this.getChunkNeighbours(chunkX, chunkY);
-          const neighbours = vox.getNeighbours(chunk, chunkNeighbours);
-
-          // side leaves
-          Object.keys(neighbours).forEach((k) => {
-            if (!neighbours[k] || k === "top" || k === "bottom") return;
-
-            neighbours[k].id = VoxelType.LEAVES;
-            const { chunk: c, chunkX: cX, chunkY: cY } = neighbours[k].getChunk();
-            let nextNeighbours;
-            if (cX !== chunkX || cY !== chunkY) {
-              nextNeighbours = neighbours[k].getNeighbours(c, this.getChunkNeighbours(cX, cY));
-            } else {
-              nextNeighbours = neighbours[k].getNeighbours(chunk, chunkNeighbours);
-            }
-
-            // if (nextNeighbours[k]) nextNeighbours[k].id = VoxelType.LEAVES;
-
-            // fill in gaps
-            if (k === "left" || k === "right") {
-              if (nextNeighbours.front) nextNeighbours.front.id = VoxelType.LEAVES;
-              if (nextNeighbours.back) nextNeighbours.back.id = VoxelType.LEAVES;
-            }
-          });
-
-          // top
-          if (neighbours.top && neighbours.top.id === VoxelType.AIR) {
-            neighbours.top.id = VoxelType.LEAVES;
-
-            const topNeighbours = neighbours.top.getNeighbours(chunk, chunkNeighbours);
-            if (topNeighbours.left) topNeighbours.left.id = VoxelType.LEAVES;
-            if (topNeighbours.right) topNeighbours.right.id = VoxelType.LEAVES;
-            if (topNeighbours.front) topNeighbours.front.id = VoxelType.LEAVES;
-            if (topNeighbours.back) topNeighbours.back.id = VoxelType.LEAVES;
-          }
-        }
-      }
-    });
-  }
-
-  getTerrainNoise(x: number, z: number) {
-    const n = Math.floor(this.noise(x * this.noisePosFactor, z * this.noisePosFactor) * this.noiseScale);
-    const n2 = Math.floor(this.noise2(x * this.noisePosFactor, z * this.noisePosFactor) * this.noise2Scale);
-    const tOff = n - n2;
-
-    return {
-      n,
-      n2,
-      tOff,
     };
   }
 
@@ -340,17 +184,6 @@ export default class World extends Scene {
         else if (x < 0) continue;
 
         chunkCb(row[x], x, y);
-      }
-    }
-  }
-
-  forEachVoxel(chunk: Chunk, voxCb: (voxel?: Voxel, x?: number, y?: number, z?: number) => void | boolean) {
-    for (let y = 0; y < chunk.length; y++) {
-      for (let x = 0; x < this.chunkSize; x++) {
-        for (let z = 0; z < this.chunkSize; z++) {
-          const vox = chunk[y][x][z];
-          voxCb(vox, x, y, z);
-        }
       }
     }
   }
@@ -507,14 +340,14 @@ export default class World extends Scene {
     if (chunkX < 0 || chunkX >= this.worldSize || chunkY < 0 || chunkY >= this.worldSize) return;
     const chunk = this.chunks[chunkY][chunkX];
 
-    const relY = y + Math.abs(this.bedrock); // 40
+    const relY = y + Math.abs(this.generatorOptions.bedrock); // 40
     const relX = x + Math.abs(chunk[0][0][0].x) * Math.sign(x * -1);
     // console.log(chunk[0][0][0].x);
     const relZ = z + Math.abs(chunk[0][0][0].z) * Math.sign(z * -1);
     // console.log(relY, relX, relZ);
     if (
       relY < 0 ||
-      relY >= this.chunkHeight ||
+      relY >= this.generatorOptions.chunkHeight ||
       relX < 0 ||
       relX >= this.chunkSize ||
       relZ < 0 ||

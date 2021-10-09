@@ -1,5 +1,5 @@
 import Engine from "./Engine";
-import World, { Chunk } from "./scenes/World";
+import World, { Chunk } from "./scenes/World/World";
 
 export interface Neighbours<T> {
   [index: string]: T;
@@ -112,7 +112,7 @@ export default class Voxel {
     const cHeight = chunk.length;
     const chunkSize = chunk[0].length;
 
-    const y = this.y + Math.abs((Engine.currScene as World).bedrock);
+    const y = this.y + Math.abs((Engine.currScene as World).generatorOptions.bedrock);
     const x = this.x + Math.abs(chunk[0][0][0].x) * Math.sign(this.x * -1);
     const z = this.z + Math.abs(chunk[0][0][0].z) * Math.sign(this.z * -1);
 

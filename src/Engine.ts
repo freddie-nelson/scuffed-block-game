@@ -7,7 +7,7 @@ import KeyboardController from "./KeyboardController";
 import MouseController from "./MouseController";
 
 import Scene from "./scenes/Scene";
-import World from "./scenes/World";
+import World from "./scenes/World/World";
 
 export default class Engine {
   static element: HTMLCanvasElement;
