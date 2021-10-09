@@ -4,7 +4,8 @@ module.exports = {
   mode: "development",
   entry: {
     main: "./src/main.ts",
-    worker: "./src/ChunkGeneratorWorker.ts",
+    "chunk-generator": "./src/ChunkGeneratorWorker.ts",
+    "geometry-generator": "./src/GeometryGeneratorWorker.ts",
   },
   output: {
     filename: "./dist/js/[name].js",
@@ -23,7 +24,7 @@ module.exports = {
       banner: `var window = self; importScripts("./common.js");`,
       raw: true,
       entryOnly: true,
-      test: "./dist/js/worker.js",
+      test: ["./dist/js/chunk-generator.js", "./dist/js/geometry-generator.js"],
     }),
   ],
   optimization: {
