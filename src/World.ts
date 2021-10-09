@@ -311,7 +311,7 @@ export default class World extends Scene {
   }
 
   private setupChunkGenerator() {
-    this.chunkGenerator = new Worker("../dist/js/chunk-generator.js");
+    this.chunkGenerator = new Worker("js/chunk-generator.js");
     this.chunkGenerator.postMessage({
       msg: "createGenerator",
       data: { seed: this.seed, options: this.chunkGeneratorOptions },
@@ -336,7 +336,7 @@ export default class World extends Scene {
   }
 
   private setupGeometryGenerator() {
-    this.geometryGenerator = new Worker("../dist/js/geometry-generator.js");
+    this.geometryGenerator = new Worker("js/geometry-generator.js");
     this.geometryGenerator.postMessage({
       msg: "createGenerator",
       data: <GeometryGeneratorOptions>{
