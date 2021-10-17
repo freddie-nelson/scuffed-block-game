@@ -34,3 +34,43 @@ body {
     transform: rotate(90deg);
   }
 }
+
+$block-size: 42px;
+
+.block-list {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  display: grid;
+  grid-template-columns: repeat((7, 1fr));
+  gap: 8px;
+  grid-auto-rows: $block-size;
+  flex-wrap: wrap;
+  padding: 12px;
+  border: 4px solid gray;
+  background-color: black;
+  border-radius: 8px;
+
+  .block {
+    position: relative;
+    width: $block-size;
+    height: $block-size;
+    border-radius: 2px;
+    border: none;
+    cursor: pointer;
+    background-repeat: no-repeat;
+    background-size: 298%;
+    image-rendering: pixelated;
+
+    &.selected::before {
+      content: "";
+      position: absolute;
+      border-radius: 2px;
+      width: calc(100% - 6px);
+      height: calc(100% - 6px);
+      border: 3px solid white;
+      top: 0;
+      left: 0;
+    }
+  }
+}

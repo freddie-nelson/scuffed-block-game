@@ -33,7 +33,7 @@ export default class World extends Scene {
   chunkMaterial: MeshLambertMaterial;
   tileSize = 16;
   tileTextureWidth = 48;
-  tileTextureHeight = 96;
+  tileTextureHeight = 352;
 
   worldSize = 512;
   renderDist = 12;
@@ -191,26 +191,8 @@ export default class World extends Scene {
     }
   }
 
-  requestGeometry(limits: { lowerX: number; iterationsX: number; lowerY: number; iterationsY: number }) {
-    const noRender: { [index: string]: boolean } = {};
-
-    // clear old uneeded meshes
-    for (let i = this.renderedMeshes.length - 1; i >= 0; i--) {
-      const mesh = this.renderedMeshes[i];
-      const x = mesh.position.x / this.chunkSize + this.chunkOffset;
-      const y = mesh.position.z / this.chunkSize + this.chunkOffset;
-
-      if (
-        x < limits.lowerX ||
-        x >= limits.lowerX + limits.iterationsX ||
-        y < limits.lowerY ||
-        y >= limits.lowerY + limits.iterationsY
-      ) {
-        this.removeChunkMesh(mesh, i);
-      } else {
-        noRender[`${x} ${y}`] = true;
-      }
-    }
+  requestGeometry(limits = this.generationLimits) {
+    const noRender: { [index: string]: boolean } = this.clearOldMeshes();
 
     // let timer = performance.now();
     // let parsedCount = 0;
@@ -224,10 +206,15 @@ export default class World extends Scene {
     // console.log(performance.now() - timer);
   }
 
+  requested = 0;
+
   requestChunkGeometry(chunk: Chunk, x: number, y: number) {
     const parsed = this.serialiseChunk(chunk);
+    this.requested++;
+    // console.log(this.requested);
     // parsedCount++;
 
+    // console.log(`Geometry request sent for (${x}, ${y}).`);
     this.geometryGenerator.postMessage({ msg: "requestGeometry", data: { chunk: parsed, x, y } }, [
       parsed.buffer,
     ]);
@@ -316,6 +303,29 @@ export default class World extends Scene {
     this.renderedMeshes.push(mesh);
   }
 
+  clearOldMeshes(limits = this.generationLimits) {
+    const noRender: { [index: string]: boolean } = {};
+
+    for (let i = this.renderedMeshes.length - 1; i >= 0; i--) {
+      const mesh = this.renderedMeshes[i];
+      const x = mesh.position.x / this.chunkSize + this.chunkOffset;
+      const y = mesh.position.z / this.chunkSize + this.chunkOffset;
+
+      if (
+        x < limits.lowerX ||
+        x >= limits.lowerX + limits.iterationsX ||
+        y < limits.lowerY ||
+        y >= limits.lowerY + limits.iterationsY
+      ) {
+        this.removeChunkMesh(mesh, i);
+      } else {
+        noRender[`${x} ${y}`] = true;
+      }
+    }
+
+    return noRender;
+  }
+
   getVoxel(x: number, y: number, z: number, chunkPos?: { x?: number; y?: number }) {
     const chunkX = Math.floor(x / this.chunkSize) + this.chunkOffset; // 1
     const chunkY = Math.floor(z / this.chunkSize) + this.chunkOffset; // 1
@@ -366,11 +376,11 @@ export default class World extends Scene {
           const { x, y, c } = data;
           this.chunks[y][x] = c;
           this.chunksQueued--;
+          this.requestChunkGeometry(c, x, y);
 
           if (this.chunksQueued === 0) {
-            // generate chunk meshes
+            this.clearOldMeshes();
             this.canRequestGeneration = true;
-            this.requestGeometry(this.generationLimits);
           }
           break;
       }
@@ -396,7 +406,7 @@ export default class World extends Scene {
       switch (msg) {
         case "geometry":
           const { x, y, positions, normals, uvs, indices } = data;
-          this.generateChunkMesh(this.chunks[y][x], positions, normals, uvs, indices);
+
           if (this.replaceChunks[`${x} ${y}`] > 0) {
             const i = this.renderedMeshes.findIndex(
               (m) =>
@@ -410,6 +420,9 @@ export default class World extends Scene {
             this.replaceChunks[`${x} ${y}`]--;
             if (this.replaceChunks[`${x} ${y}`] === 0) delete this.replaceChunks[`${x} ${y}`];
           }
+
+          this.generateChunkMesh(this.chunks[y][x], positions, normals, uvs, indices);
+
           // this.chunks[y][x] = c;
           // this.chunksQueued--;
 

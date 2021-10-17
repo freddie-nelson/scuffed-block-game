@@ -1,6 +1,4 @@
-import { BufferAttribute, BufferGeometry } from "three";
-import Voxel, { faces, Neighbours, VoxelType } from "./Voxel";
-import { Chunk } from "./World";
+import { faces, Neighbours, VoxelType } from "./Voxel";
 
 export interface GeometryGeneratorOptions {
   chunkSize: number;

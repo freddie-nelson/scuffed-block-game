@@ -1,4 +1,4 @@
-import World, { Chunk } from "./World";
+import { Chunk } from "./World";
 
 export interface Neighbours<T> {
   [index: string]: T;
@@ -86,12 +86,33 @@ export const faces: { [index: string]: Face } = {
 
 export enum VoxelType {
   AIR,
+
   GRASS,
   DIRT,
+
+  LEAVES,
   LOG,
   WOOD,
+
   STONE,
-  LEAVES,
+  COAL,
+  COPPER,
+  SILVER,
+  GOLD,
+  COBALT,
+  URANIUM,
+
+  COAL_BLOCK,
+  COPPER_BLOCK,
+  SILVER_BLOCK,
+  GOLD_BLOCK,
+  COBALT_BLOCK,
+  URANIUM_BLOCK,
+
+  BRICKS,
+  STONE_BRICKS,
+  CRACKED_STONE_BRICKS,
+  MOSSY_STONE_BRICKS,
 }
 
 export default class Voxel {

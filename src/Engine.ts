@@ -8,6 +8,7 @@ import MouseController from "./MouseController";
 
 import Scene from "./Scene";
 import World from "./World";
+import Gui from "./Gui";
 
 export default class Engine {
   static element: HTMLCanvasElement;
@@ -22,6 +23,7 @@ export default class Engine {
   static mouseController: MouseController;
   static keyController: KeyboardController;
   static random: ReturnType<sr.Callback>;
+  static gui: Gui;
 
   constructor(element: HTMLCanvasElement) {
     Engine.renderer.setSize(window.innerWidth, window.innerHeight);
@@ -47,8 +49,9 @@ export default class Engine {
     Engine.setupPerspectiveCam();
 
     Engine.currScene.init();
-    Engine.clock.start();
+    Engine.gui = new Gui((Engine.currScene as World).player);
 
+    Engine.clock.start();
     Engine.render();
   }
 

@@ -25,6 +25,8 @@ export default class Player {
   destroyLimit = 200;
   blockRange = 5;
 
+  selectedBlockType = VoxelType.GRASS;
+
   constructor(x: number, y: number, z: number) {
     const geometry = new BoxBufferGeometry(this.width, this.height, this.width);
     const material = new MeshBasicMaterial({ color: 0x0000ff });
@@ -69,7 +71,7 @@ export default class Player {
         case 2:
           if (time - this.lastPlaceTime > this.placeLimit) {
             this.lastPlaceTime = time;
-            this.setSelectedVoxel(true, VoxelType.DIRT);
+            this.setSelectedVoxel(true, this.selectedBlockType);
           }
           break;
       }
@@ -180,20 +182,20 @@ export default class Player {
     else world.replaceChunks[key] = 1;
     world.requestChunkGeometry(chunk, chunkX, chunkY);
 
-    const cn = world.getChunkNeighbours(chunkX, chunkY);
-    const n = vox.getNeighbours(world.chunks[chunkY][chunkX], cn, world.chunkGeneratorOptions.bedrock);
+    // const cn = world.getChunkNeighbours(chunkX, chunkY);
+    // const n = vox.getNeighbours(world.chunks[chunkY][chunkX], cn, world.chunkGeneratorOptions.bedrock);
 
-    Object.keys(n).forEach((k) => {
-      if (!n[k]) return;
-      const { chunkX: ncx, chunkY: ncy } = vox.getChunk(world.chunkSize, world.chunkOffset);
-      if (ncx !== chunkX || ncy !== chunkY) {
-        const chunk = world.chunks[ncy][ncx];
-        const key = `${ncx} ${ncy}`;
-        if (world.replaceChunks[key]) world.replaceChunks[key]++;
-        else world.replaceChunks[key] = 1;
-        world.requestChunkGeometry(chunk, ncx, ncy);
-      }
-    });
+    // Object.keys(n).forEach((k) => {
+    //   if (!n[k]) return;
+    //   const { chunkX: ncx, chunkY: ncy } = vox.getChunk(world.chunkSize, world.chunkOffset);
+    //   if (ncx !== chunkX || ncy !== chunkY) {
+    //     const chunk = world.chunks[ncy][ncx];
+    //     const key = `${ncx} ${ncy}`;
+    //     if (world.replaceChunks[key]) world.replaceChunks[key]++;
+    //     else world.replaceChunks[key] = 1;
+    //     world.requestChunkGeometry(chunk, ncx, ncy);
+    //   }
+    // });
   }
 
   private findSelectedVoxel(outside: boolean = false) {
@@ -215,10 +217,11 @@ export default class Player {
 
       // check if voxel collides with player
       if (
-        vox.x === Math.floor(this.object.position.x) &&
-        vox.y >= Math.floor(this.object.position.y) - this.height / 2 &&
-        vox.y < Math.floor(this.object.position.y) + this.height / 2 &&
-        vox.z === Math.floor(this.object.position.z)
+        !vox ||
+        (vox.x === Math.floor(this.object.position.x) &&
+          vox.y >= Math.floor(this.object.position.y) - this.height / 2 &&
+          vox.y < Math.floor(this.object.position.y) + this.height / 2 &&
+          vox.z === Math.floor(this.object.position.z))
       ) {
         return undefined;
       }
@@ -394,7 +397,7 @@ export default class Player {
     const chunkY = Math.floor(this.object.position.z / world.chunkSize + world.chunkOffset);
 
     return {
-      chunk: world.chunks[chunkY][chunkX],
+      chunk: world.chunks[chunkY] ? world.chunks[chunkY][chunkX] : undefined,
       chunkX,
       chunkY,
     };

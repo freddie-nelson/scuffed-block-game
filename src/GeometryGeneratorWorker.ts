@@ -13,6 +13,7 @@ ctx.onmessage = (ev) => {
       break;
     case "requestGeometry":
       if (generator) {
+        // console.log(`Geometry request recieved for (${data.x}, ${data.y}).`);
         const geo = generator.generateChunkGeometry(data.chunk);
         const { positions, uvs, normals, indices } = generator.convertGeoToTypedArrs(geo);
         ctx.postMessage(
